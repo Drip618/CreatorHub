@@ -6,24 +6,31 @@ class PermissionManager {
     static let shared = PermissionManager()
     
     func checkAndRequestPermissions() {
-        requestAccessibility()
+        // Just check, don't force prompt unless needed
+        if !isAccessibilityEnabled() {
+            // Optional: You could show a custom one-time alert here instead of the system one
+            // requestAccessibility(force: true)
+        }
         requestScreenRecording()
     }
     
-    private func requestAccessibility() {
-        let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String : true]
-        let accessEnabled = AXIsProcessTrustedWithOptions(options)
-        if !accessEnabled {
-            print("Accessibility permission not granted. System should prompt.")
-        }
+    func isAccessibilityEnabled() -> Bool {
+        let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String : false]
+        return AXIsProcessTrustedWithOptions(options)
+    }
+    
+    private func requestAccessibility(force: Bool) {
+        let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String : force]
+        AXIsProcessTrustedWithOptions(options)
     }
     
     private func requestScreenRecording() {
         if #available(macOS 10.15, *) {
-            // A simple way to trigger the screen recording prompt is to try to capture the screen
-            guard CGWindowListCreateImage(.null, .optionOnScreenOnly, kCGNullWindowID, []) != nil else {
-                print("Screen recording permission not granted. System should prompt.")
-                return
+            // Check if we can capture screen
+            let canCapture = CGPreflightScreenCaptureAccess()
+            if !canCapture {
+                // This will trigger the system prompt if not granted
+                CGRequestScreenCaptureAccess()
             }
         }
     }
