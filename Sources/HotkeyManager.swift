@@ -44,8 +44,8 @@ class HotkeyManager {
         
         let settings = SettingsManager.shared
         for hk in settings.customHotkeys {
-            if let keyCode = hk.keyCode, let modifiers = hk.modifiers, let actionId = hk.actionId {
-                register(keyCode: keyCode, modifiers: modifiers, id: UInt32(hk.id)) {
+            if let actionId = hk.actionId {
+                register(keyCode: hk.keyCode, modifiers: hk.modifiers, id: UInt32(hk.id)) {
                     self.dispatchAction(actionId: actionId)
                 }
             }
