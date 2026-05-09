@@ -1,0 +1,9 @@
+*.app
+*.zip
+.DS_Store
+DerivedData/
+build/
+bin/
+ffmpeg
+pandoc
+yt-dlp
