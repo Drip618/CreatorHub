@@ -7,7 +7,6 @@ struct ToolItem: Identifiable {
     let title: String
     let subtitle: String
     let actionId: String
-    var isMenu: Bool = false
     let action: () -> Void
 }
 
@@ -29,7 +28,10 @@ struct ToolboxView: View {
                     ToolboxSection(title: "🎬 创作流 (Creative Pro)", tools: [
                         ToolItem(icon: "camera.viewfinder", title: "屏幕截图", subtitle: "自动保存并拷贝至剪贴板", actionId: "screenshot", action: { triggerScreenshot(mode: .normal) }),
                         ToolItem(icon: "text.viewfinder", title: "文字识别", subtitle: "一键提取屏幕文字", actionId: "ocr", action: { triggerScreenshot(mode: .ocr) }),
-                        ToolItem(icon: "character.book.closed", title: "图片翻译", subtitle: "截图 或 选择本地文件", actionId: "translate", isMenu: true, action: { }), // Action handled by Menu
+                        ToolItem(icon: "character.book.closed", title: "图片翻译", subtitle: "截图 或 选择本地文件", actionId: "translate", action: { 
+                            self.activeConfigType = .translation
+                            self.isConfigPresented = true
+                        }),
                         ToolItem(icon: "waveform", title: "音频标准化", subtitle: "一键平衡音量 (-14 LUFS)", actionId: "normalize_audio", action: { normalizeAudioFlow() }),
                         ToolItem(icon: "video.fill", title: "万能视频转码", subtitle: "分辨率/格式/画质配置", actionId: "video_transcode", action: { pickFilesAsync(type: .videoTranscode) }),
                         ToolItem(icon: "video.slash", title: "视频去水印", subtitle: "智能修补，批量去水印", actionId: "media_download", action: { showFFmpegDialogAsync() })
@@ -48,13 +50,6 @@ struct ToolboxView: View {
                         ToolItem(icon: "character.cursor.ibeam", title: "宇宙文档转换", subtitle: "Word/PDF/MD 自由互转", actionId: "doc_convert", action: { showPandocDialogAsync() }),
                         ToolItem(icon: "plus.slash.minus", title: "万能计算与换算", subtitle: "单位/汇率/科学计算", actionId: "unit_calc", action: { (NSApp.delegate as? AppDelegate)?.showSmartCalc(tab: 1) })
                     ])
-
-                    ToolboxSection(title: "📊 智能辅助", tools: [
-                        ToolItem(icon: "eyedropper", title: "屏幕取色", subtitle: "实时提取 HEX 颜色代码", actionId: "pick_color", action: { settings.pickColor(); showMessage = "颜色已复制" }),
-                        ToolItem(icon: settings.isAwake ? "sun.max.fill" : "moon.zzz", title: "屏幕常亮", subtitle: "阻止系统自动睡眠", actionId: "anti_sleep", action: { settings.toggleAwake() }),
-                        ToolItem(icon: "curlybraces", title: "JSON 专家", subtitle: "文本转 JSON/格式化", actionId: "json_format", action: { showMessage = settings.smartJSONConvert() }),
-                        ToolItem(icon: "bolt.fill", title: "快速开始", subtitle: "软件完整使用手册", actionId: "help", action: { showManual() })
-                    ])
                 }
                 .padding(20)
             }
@@ -64,7 +59,6 @@ struct ToolboxView: View {
                     Spacer()
                     Text(msg).font(.subheadline).foregroundColor(.white).padding(.horizontal, 16).padding(.vertical, 8).background(Color.black.opacity(0.8)).cornerRadius(20).padding(.bottom, 40)
                 }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
                 .onAppear { DispatchQueue.main.asyncAfter(deadline: .now() + 2) { showMessage = nil } }
             }
         }
@@ -99,39 +93,36 @@ struct ToolboxView: View {
         switch type {
         case .imageProcess:
             if let (scale, format) = config as? (Double, UTType) {
-                imageProcessor.processImages(urls: selectedUrls, action: .resize(scale: scale), saveTo: settings.saveUrl) { _ in showMessage = "图片处理完成" }
+                imageProcessor.processImages(urls: selectedUrls, action: .resize(scale: scale), saveTo: settings.saveUrl) { _ in showMessage = "处理完成" }
             }
         case .videoTranscode:
             if let (res, format, quality) = config as? (String, String, String) {
-                for url in selectedUrls {
-                    ultimateManager.processVideo(url: url, action: .customTranscode(res: res, format: format, quality: quality)) { _, m in showMessage = m }
-                }
+                for url in selectedUrls { ultimateManager.processVideo(url: url, action: .customTranscode(res: res, format: format, quality: quality)) { _, m in showMessage = m } }
             }
         case .idPhoto:
             if let color = config as? Color {
                 let nsColor = NSColor(color)
                 if let ciColor = CIColor(color: nsColor) {
-                    imageProcessor.processImages(urls: selectedUrls, action: .idPhotoMaker(color: ciColor), saveTo: settings.saveUrl) { _ in showMessage = "证件照制作完成" }
+                    imageProcessor.processImages(urls: selectedUrls, action: .idPhotoMaker(color: ciColor), saveTo: settings.saveUrl) { _ in showMessage = "制作完成" }
                 }
             }
         case .gridSlice:
             if let (r, c) = config as? (Int, Int) {
                 imageProcessor.processImages(urls: selectedUrls, action: .sliceGrid(rows: r, columns: c), saveTo: settings.saveUrl) { _ in showMessage = "切割完成" }
             }
-        case .translation: break // No longer handled by sheet
+        case .translation:
+            if let mode = config as? String {
+                if mode == "screen" { triggerScreenshot(mode: .translate) }
+                else { TranslateManager.shared.pickImageAndTranslate() }
+            }
         }
     }
     
-    // ... rest of the helper methods (showFFmpegDialogAsync, etc.) remain same
     private func showFFmpegDialogAsync() {
-        let panel = NSOpenPanel(); panel.begin { response in
-            if response == .OK, let url = panel.url { ultimateManager.processVideo(url: url, action: .compress) { _, m in showMessage = m } }
-        }
+        let panel = NSOpenPanel(); panel.begin { response in if response == .OK, let url = panel.url { ultimateManager.processVideo(url: url, action: .compress) { _, m in showMessage = m } } }
     }
     private func showPandocDialogAsync() {
-        let panel = NSOpenPanel(); panel.begin { response in
-            if response == .OK, let url = panel.url { ultimateManager.processDocument(url: url, action: .mdToWord) { _, m in showMessage = m } }
-        }
+        let panel = NSOpenPanel(); panel.begin { response in if response == .OK, let url = panel.url { ultimateManager.processDocument(url: url, action: .mdToWord) { _, m in showMessage = m } } }
     }
     private func cleanCacheFlowAsync() {
         let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false
@@ -149,10 +140,6 @@ struct ToolboxView: View {
         let panel = NSOpenPanel(); panel.allowedContentTypes = [.xml, .init(filenameExtension: "fcpxml")!].compactMap { $0 }
         panel.begin { response in if response == .OK, let url = panel.url { DocumentManager.shared.downgradeXML(url: url, targetVersion: "1.9") { _, m in showMessage = m } } }
     }
-    private func showManual() {
-        let path = "/Users/Drip/Antigravity/Projects/MacCaptureHubNative/Creator_Hub_User_Manual.md"
-        NSWorkspace.shared.open(URL(fileURLWithPath: path))
-    }
 }
 
 struct ToolboxSection: View {
@@ -168,34 +155,21 @@ struct ToolboxSection: View {
 struct ToolRow: View {
     let tool: ToolItem; @State private var isHovered = false
     var body: some View {
-        Group {
-            if tool.isMenu {
-                Menu {
-                    Button("屏幕截图翻译") { (NSApp.delegate as? AppDelegate)?.triggerScreenshot(mode: .translate) }
-                    Button("选择本地图片翻译") { TranslateManager.shared.pickImageAndTranslate() }
-                } label: { labelContent }
-                .menuStyle(BorderlessButtonMenuStyle())
-            } else {
-                Button(action: tool.action) { labelContent }
+        Button(action: tool.action) {
+            HStack(spacing: 12) {
+                Image(systemName: tool.icon).font(.system(size: 20)).foregroundColor(.accentColor).frame(width: 30)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(tool.title).font(.system(size: 13, weight: .semibold))
+                    Text(tool.subtitle).font(.system(size: 10)).foregroundColor(.secondary).lineLimit(1)
+                }
+                Spacer()
+                if let hkString = SettingsManager.shared.getHotkeyString(for: tool.actionId) {
+                    Text(hkString).font(.system(size: 10, weight: .bold, design: .monospaced)).padding(.horizontal, 6).padding(.vertical, 2).background(Color.accentColor.opacity(0.1)).foregroundColor(.accentColor).cornerRadius(4)
+                }
             }
+            .padding(12).background(Color(NSColor.controlBackgroundColor).opacity(isHovered ? 0.8 : 0.4)).cornerRadius(12)
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.accentColor.opacity(isHovered ? 0.3 : 0), lineWidth: 1))
         }
         .buttonStyle(.plain).onHover { isHovered = $0 }
-    }
-    
-    private var labelContent: some View {
-        HStack(spacing: 12) {
-            Image(systemName: tool.icon).font(.system(size: 20)).foregroundColor(.accentColor).frame(width: 30)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(tool.title).font(.system(size: 13, weight: .semibold))
-                Text(tool.subtitle).font(.system(size: 10)).foregroundColor(.secondary).lineLimit(1)
-            }
-            Spacer()
-            if let hkString = SettingsManager.shared.getHotkeyString(for: tool.actionId) {
-                Text(hkString).font(.system(size: 10, weight: .bold, design: .monospaced)).padding(.horizontal, 6).padding(.vertical, 2).background(Color.accentColor.opacity(0.1)).foregroundColor(.accentColor).cornerRadius(4).padding(.trailing, 4)
-            }
-        }
-        .padding(12).background(Color(NSColor.controlBackgroundColor).opacity(isHovered ? 0.8 : 0.4)).cornerRadius(12)
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.accentColor.opacity(isHovered ? 0.3 : 0), lineWidth: 1))
-        .contentShape(Rectangle())
     }
 }
