@@ -109,7 +109,31 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
-    func triggerScreenshot() {
+    enum ScreenshotMode {
+        case normal, ocr, translate
+    }
+
+    func triggerScreenshot(mode: ScreenshotMode = .normal) {
+        if mode == .ocr {
+            OCRManager.shared.recognizeTextFromScreen { text in
+                if let t = text {
+                    FloatingWindowManager.shared.show(title: "文字识别成功", text: t)
+                }
+            }
+            return
+        }
+        
+        if mode == .translate {
+            OCRManager.shared.recognizeTextFromScreen { text in
+                if let t = text {
+                    TranslateManager.shared.translateText(t) { result in
+                        FloatingWindowManager.shared.show(title: "截图翻译结果", text: result ?? "翻译失败，请重试")
+                    }
+                }
+            }
+            return
+        }
+
         let tempUrl = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("Screenshot_\(Int(Date().timeIntervalSince1970)).png")
         let task = Process()
         task.launchPath = "/usr/sbin/screencapture"

@@ -76,4 +76,56 @@ class OCRManager: ObservableObject {
             }
         }
     }
-}
+    func recognizeTextFromURL(_ url: URL, completion: @escaping (String?) -> Void) {
+        guard !isRecognizing else { return }
+        
+        DispatchQueue.main.async {
+            self.isRecognizing = true
+        }
+        
+        guard let image = NSImage(contentsOf: url),
+              let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            DispatchQueue.main.async {
+                self.isRecognizing = false
+                completion(nil)
+            }
+            return
+        }
+        
+        let request = VNRecognizeTextRequest { request, error in
+            guard error == nil else {
+                DispatchQueue.main.async {
+                    self.isRecognizing = false
+                    completion(nil)
+                }
+                return
+            }
+            
+            let observations = request.results as? [VNRecognizedTextObservation] ?? []
+            let recognizedText = observations.compactMap { observation in
+                observation.topCandidates(1).first?.string
+            }.joined(separator: "\n")
+            
+            DispatchQueue.main.async {
+                self.isRecognizing = false
+                completion(recognizedText.isEmpty ? nil : recognizedText)
+            }
+        }
+        
+        request.recognitionLevel = .accurate
+        if #available(macOS 11.0, *) {
+            request.recognitionLanguages = ["zh-Hans", "en-US"]
+        }
+        
+        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                try handler.perform([request])
+            } catch {
+                DispatchQueue.main.async {
+                    self.isRecognizing = false
+                    completion(nil)
+                }
+            }
+        }
+    }
