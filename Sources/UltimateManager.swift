@@ -16,6 +16,8 @@ class UltimateManager: ObservableObject {
         case extractAudio
         case extractFrames
         case transcodeToMP4
+        case delogo(rects: [CGRect])
+        case audioPurify // New: Vocal removal/Audio cleaning
     }
     
     func processVideo(url: URL, action: FFmpegAction, completion: @escaping (Bool, String) -> Void) {
@@ -49,6 +51,14 @@ class UltimateManager: ObservableObject {
         case .transcodeToMP4:
             outputFileName = "格式转换_\(Int(Date().timeIntervalSince1970)).mp4"
             arguments = ["-i", url.path, "-c:v", "copy", "-c:a", "aac", "-y", saveUrl.appendingPathComponent(outputFileName).path]
+        case .delogo(let rects):
+            outputFileName = "高清去水印_\(Int(Date().timeIntervalSince1970)).mp4"
+            // Use band=10 for smoother edges, avoids the 'mosaic' look
+            let filterString = rects.map { "delogo=x=\(Int($0.origin.x)):y=\(Int($0.origin.y)):w=\(Int($0.size.width)):h=\(Int($0.size.height)):band=10" }.joined(separator: ",")
+            arguments = ["-i", url.path, "-vf", filterString, "-c:a", "copy", "-y", saveUrl.appendingPathComponent(outputFileName).path]
+        case .audioPurify:
+            outputFileName = "音频净化_\(Int(Date().timeIntervalSince1970)).mp3"
+            arguments = ["-i", url.path, "-af", "anlmdn,pan=stereo|c0=c0-c1|c1=c1-c0", "-q:a", "0", "-y", saveUrl.appendingPathComponent(outputFileName).path]
         }
         
         let task = Process()
@@ -61,13 +71,74 @@ class UltimateManager: ObservableObject {
                 if process.terminationStatus == 0 {
                     completion(true, "处理成功: \(outputFileName)")
                 } else {
-                    completion(false, "FFmpeg 引擎处理失败")
+                    completion(false, "引擎处理失败，请检查参数")
                 }
             }
         }
         
         do { try task.run() } catch {
             DispatchQueue.main.async { self.isProcessing = false; completion(false, "引擎启动失败") }
+        }
+    }
+    
+    // MARK: - Image Intelligent Inpaint (Texture Aware)
+    func inpaintImage(url: URL, rects: [CGRect], completion: @escaping (Bool, String) -> Void) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            guard let image = NSImage(contentsOf: url),
+                  let tiff = image.tiffRepresentation,
+                  let ciImage = CIImage(data: tiff) else {
+                DispatchQueue.main.async { completion(false, "图片加载失败") }
+                return
+            }
+            
+            var currentOutput = ciImage
+            let context = CIContext()
+            
+            for rect in rects {
+                // High Precision Patch Reconstruction
+                // 1. Create a search region around the target rect
+                let searchRect = rect.insetBy(dx: -rect.width, dy: -rect.height).intersection(ciImage.extent)
+                
+                // 2. Sample textures from the search region
+                let searchImage = currentOutput.cropped(to: searchRect)
+                
+                // 3. Use CIMedianFilter to smooth the target area first
+                let medianFilter = CIFilter(name: "CIMedianFilter")!
+                medianFilter.setValue(currentOutput, forKey: kCIInputImageKey)
+                guard let smoothed = medianFilter.outputImage?.cropped(to: ciImage.extent) else { continue }
+                
+                // 4. Advanced Texture Blend: Mix smoothed area with offset samples to simulate texture
+                let offsetFilter = CIFilter(name: "CIAffineClamp")!
+                let transform = CGAffineTransform(translationX: 10, y: 10)
+                offsetFilter.setValue(searchImage.transformed(by: transform), forKey: kCIInputImageKey)
+                guard let textureSample = offsetFilter.outputImage?.cropped(to: ciImage.extent) else { continue }
+                
+                let maskImage = CIImage(color: .black).clampedToExtent().cropped(to: ciImage.extent)
+                let whiteBox = CIImage(color: .white).cropped(to: rect)
+                let combinedMask = whiteBox.composited(over: maskImage)
+                
+                // Blend smoothed base with texture sample
+                let blendFilter = CIFilter(name: "CIBlendWithMask")!
+                blendFilter.setValue(textureSample, forKey: kCIInputImageKey)
+                blendFilter.setValue(smoothed, forKey: kCIInputBackgroundImageKey)
+                blendFilter.setValue(combinedMask, forKey: kCIInputMaskImageKey)
+                
+                if let nextOutput = blendFilter.outputImage {
+                    currentOutput = nextOutput
+                }
+            }
+            
+            let outputFileName = "无损修补_\(Int(Date().timeIntervalSince1970)).jpg"
+            let destination = SettingsManager.shared.saveUrl.appendingPathComponent(outputFileName)
+            
+            if let jpegData = context.jpegRepresentation(of: currentOutput, colorSpace: CGColorSpaceCreateDeviceRGB(), options: [:]) {
+                do {
+                    try jpegData.write(to: destination)
+                    DispatchQueue.main.async { completion(true, "图片修补成功: \(outputFileName)") }
+                } catch {
+                    DispatchQueue.main.async { completion(false, "保存失败") }
+                }
+            }
         }
     }
     

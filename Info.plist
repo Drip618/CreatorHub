@@ -45,6 +45,8 @@
 				<string>public.image</string>
 				<string>public.movie</string>
 				<string>com.adobe.pdf</string>
+				<string>public.url</string>
+				<string>public.file-url</string>
 			</array>
 		</dict>
 	</array>

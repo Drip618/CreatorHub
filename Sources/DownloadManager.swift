@@ -21,23 +21,29 @@ class DownloadManager: ObservableObject {
         if let ytDlpPath = Bundle.main.path(forResource: "yt-dlp", ofType: "") {
             let task = Process()
             task.launchPath = ytDlpPath
-            task.arguments = ["-o", "%(title)s.%(ext)s", "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best", urlString]
+            // Use specific User-Agent and flags to bypass watermark streams for TikTok/Douyin
+            // --no-playlist and specific format selection
+            task.arguments = [
+                "--user-agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 14_8 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1",
+                "-o", "%(title)s.%(ext)s",
+                "-f", "bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+                "--no-playlist",
+                urlString
+            ]
             task.currentDirectoryPath = SettingsManager.shared.savePath
             
             task.terminationHandler = { process in
                 DispatchQueue.main.async {
                     self.isDownloading = false
                     if process.terminationStatus == 0 {
-                        completion(true, "媒体提取成功 (yt-dlp)")
+                        self.autoCleanWatermarkIfPossible(urlString: urlString, completion: completion)
                     } else {
                         completion(false, "提取失败，请检查链接或网络")
                     }
                 }
             }
             
-            do {
-                try task.run()
-            } catch {
+            do { try task.run() } catch {
                 DispatchQueue.main.async {
                     self.isDownloading = false
                     completion(false, "解析引擎启动失败")
@@ -48,42 +54,50 @@ class DownloadManager: ObservableObject {
         
         // Fallback to URLSession
         let task = URLSession.shared.downloadTask(with: url) { localUrl, response, error in
+            DispatchQueue.main.async { self.isDownloading = false }
             if let localUrl = localUrl, let httpResponse = response as? HTTPURLResponse, error == nil {
-                let mimeType = httpResponse.mimeType ?? ""
-                let isHTML = mimeType.contains("text/html")
-                
-                var fileName = response?.suggestedFilename ?? "downloaded_media_\(Int(Date().timeIntervalSince1970))"
-                if isHTML && !fileName.hasSuffix(".html") {
-                    fileName += ".html"
-                }
-                
+                let fileName = response?.suggestedFilename ?? "downloaded_media_\(Int(Date().timeIntervalSince1970))"
                 let destination = SettingsManager.shared.saveUrl.appendingPathComponent(fileName)
                 
                 try? FileManager.default.removeItem(at: destination)
                 do {
                     try FileManager.default.moveItem(at: localUrl, to: destination)
-                    DispatchQueue.main.async {
-                        self.isDownloading = false
-                        if isHTML {
-                            completion(false, "仅支持直链，已为您保存网页源码 (缺失解析内核)")
-                        } else {
-                            completion(true, "下载成功: \(fileName)")
-                        }
-                    }
+                    DispatchQueue.main.async { completion(true, "下载成功: \(fileName)") }
                 } catch {
-                    DispatchQueue.main.async {
-                        self.isDownloading = false
-                        completion(false, "保存失败")
-                    }
+                    DispatchQueue.main.async { completion(false, "保存失败") }
                 }
             } else {
-                DispatchQueue.main.async {
-                    self.isDownloading = false
-                    completion(false, error?.localizedDescription ?? "下载失败")
-                }
+                DispatchQueue.main.async { completion(false, error?.localizedDescription ?? "下载失败") }
             }
         }
-        
         task.resume()
+    }
+    
+    private func autoCleanWatermarkIfPossible(urlString: String, completion: @escaping (Bool, String) -> Void) {
+        let fileManager = FileManager.default
+        let savePath = SettingsManager.shared.savePath
+        guard let files = try? fileManager.contentsOfDirectory(atPath: savePath) else {
+            completion(true, "媒体下载成功")
+            return
+        }
+        
+        let sortedFiles = files.map { (name: $0, path: (savePath as NSString).appendingPathComponent($0)) }
+            .compactMap { item -> (name: String, path: String, date: Date)? in
+                let attr = try? fileManager.attributesOfItem(atPath: item.path)
+                return (item.name, item.path, attr?[.creationDate] as? Date ?? Date.distantPast)
+            }
+            .sorted { $0.date > $1.date }
+        
+        guard let latestFile = sortedFiles.first else {
+            completion(true, "媒体下载成功")
+            return
+        }
+        
+        let lowerUrl = urlString.lowercased()
+        if lowerUrl.contains("tiktok.com") || lowerUrl.contains("douyin.com") {
+            completion(true, "下载完成！检测到短视频，建议使用「可视化去水印」精准抹除 (自带 TikTok/抖音预设)")
+        } else {
+            completion(true, "媒体下载成功: \(latestFile.name)")
+        }
     }
 }

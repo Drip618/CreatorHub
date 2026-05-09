@@ -11,7 +11,11 @@ class SettingsManager: ObservableObject {
     }
     
     var saveUrl: URL {
-        URL(fileURLWithPath: savePath)
+        let url = URL(fileURLWithPath: savePath).appendingPathComponent("Test_Downloads")
+        if !FileManager.default.fileExists(atPath: url.path) {
+            try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        }
+        return url
     }
     
     init() {
