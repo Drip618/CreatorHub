@@ -30,7 +30,7 @@ struct ToolboxView: View {
                         ToolItem(icon: "text.viewfinder", title: "文字识别", subtitle: "一键提取屏幕文字", actionId: "ocr", action: { triggerScreenshot(mode: .ocr) }),
                         ToolItem(icon: "character.book.closed", title: "图像翻译专家", subtitle: "截图翻译 或 选择本地图片", actionId: "translate", action: { showTranslateMenu() }),
                         ToolItem(icon: "waveform", title: "音频标准化", subtitle: "一键处理音量平衡 (-14 LUFS)", actionId: "normalize_audio", action: { normalizeAudioFlow() }),
-                        ToolItem(icon: "arrow.triangle.2.circlepath.video", title: "万能视频转码", subtitle: "分辨率/格式/画质自由配置", actionId: "video_transcode", action: { pickFilesAsync(type: .videoTranscode) }),
+                        ToolItem(icon: "video.fill", title: "万能视频转码", subtitle: "分辨率/格式/画质自由配置", actionId: "video_transcode", action: { pickFilesAsync(type: .videoTranscode) }),
                         ToolItem(icon: "video.slash", title: "视频去水印", subtitle: "智能修补，支持批量处理", actionId: "media_download", action: { showFFmpegDialogAsync() })
                     ])
                     
@@ -42,10 +42,10 @@ struct ToolboxView: View {
                     ])
                     
                     ToolboxSection(title: "📄 极速工作流 (Workflow)", tools: [
-                        ToolItem(icon: "doc.text.inverse", title: "XML 版本降级", subtitle: "适配 FCPX/PR 工程版本", actionId: "xml_downgrade", action: { downgradeXMLFlowAsync() }),
+                        ToolItem(icon: "doc.text.fill", title: "XML 版本降级", subtitle: "适配 FCPX/PR 工程版本", actionId: "xml_downgrade", action: { downgradeXMLFlowAsync() }),
                         ToolItem(icon: "trash", title: "媒体缓存清理", subtitle: "释放 FCPX/PR 磁盘空间", actionId: "clean_cache", action: { cleanCacheFlowAsync() }),
                         ToolItem(icon: "character.cursor.ibeam", title: "宇宙文档转换", subtitle: "Word/PDF/MD 自由互转", actionId: "doc_convert", action: { showPandocDialogAsync() }),
-                        ToolItem(icon: "ruler", title: "万能计算与换算", subtitle: "单位/汇率/科学计算", actionId: "unit_calc", action: { (NSApp.delegate as? AppDelegate)?.showSmartCalc(tab: 1) })
+                        ToolItem(icon: "plus.slash.minus", title: "万能计算与换算", subtitle: "单位/汇率/科学计算", actionId: "unit_calc", action: { (NSApp.delegate as? AppDelegate)?.showSmartCalc(tab: 1) })
                     ])
 
                     ToolboxSection(title: "📊 智能辅助", tools: [
