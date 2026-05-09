@@ -88,7 +88,7 @@ struct SmartCalculatorView: View {
             .padding(.horizontal, 30)
             .padding(.bottom, 30)
         }
-        .frame(width: 440)
+        .frame(width: 480)
         .background(CalcVisualEffectView(material: .hudWindow, blendingMode: .behindWindow).ignoresSafeArea())
     }
     
@@ -147,10 +147,10 @@ struct SmartCalculatorView: View {
             VStack(alignment: .leading, spacing: 15) {
                 Text("选择换算类型").font(.headline).foregroundColor(.secondary)
                 Picker("", selection: $selectedUnit) {
-                    Text("📏 长度 (m -> ft)").tag("len")
-                    Text("⚖️ 重量 (kg -> lb)").tag("weight")
-                    Text("📐 面积 (m² -> ft²)").tag("area")
-                    Text("🧪 体积 (L -> Gal)").tag("vol")
+                    Text("📏 长度").tag("len")
+                    Text("⚖️ 重量").tag("weight")
+                    Text("📐 面积").tag("area")
+                    Text("🧪 体积").tag("vol")
                 }
                 .pickerStyle(.segmented)
             }

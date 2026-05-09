@@ -2,7 +2,7 @@ import SwiftUI
 import Carbon
 
 struct ShortcutRecorderView: View {
-    @Binding var keyData: [UInt32] // [keyCode, modifiers]
+    @Binding var hotkey: CustomHotkey
     @State private var isRecording = false
     
     var body: some View {
@@ -23,81 +23,29 @@ struct ShortcutRecorderView: View {
             }
         }
         .buttonStyle(PlainButtonStyle())
-        .background(ShortcutHandlerView(isRecording: $isRecording, keyData: $keyData))
+        .background(ShortcutHandlerView(isRecording: $isRecording, hotkey: $hotkey))
     }
     
     var displayString: String {
-        let keyCode = keyData[0]
-        let modifiers = keyData[1]
-        
-        var str = ""
-        if modifiers & UInt32(0x100) != 0 { str += "⌘" }
-        if modifiers & UInt32(0x0800) != 0 { str += "⌥" }
-        if modifiers & UInt32(0x0200) != 0 { str += "⇧" }
-        if modifiers & UInt32(0x0400) != 0 { str += "⌃" }
-        
-        str += keyName(for: keyCode)
-        return str.isEmpty ? "未设置" : str
-    }
-    
-    func keyName(for keyCode: UInt32) -> String {
-        // Simple mapping for common keys
-        switch keyCode {
-        case 18: return "1"
-        case 19: return "2"
-        case 20: return "3"
-        case 21: return "4"
-        case 23: return "5"
-        case 22: return "6"
-        case 26: return "7"
-        case 28: return "8"
-        case 25: return "9"
-        case 29: return "0"
-        case 0: return "A"
-        case 11: return "B"
-        case 8: return "C"
-        case 2: return "D"
-        case 14: return "E"
-        case 3: return "F"
-        case 5: return "G"
-        case 4: return "H"
-        case 34: return "I"
-        case 38: return "J"
-        case 40: return "K"
-        case 37: return "L"
-        case 46: return "M"
-        case 45: return "N"
-        case 31: return "O"
-        case 35: return "P"
-        case 12: return "Q"
-        case 15: return "R"
-        case 1: return "S"
-        case 17: return "T"
-        case 32: return "U"
-        case 9: return "V"
-        case 13: return "W"
-        case 7: return "X"
-        case 16: return "Y"
-        case 6: return "Z"
-        case 49: return "Space"
-        default: return "Key\(keyCode)"
-        }
+        guard let keyCode = hotkey.keyCode, let modifiers = hotkey.modifiers else { return "未设置" }
+        return SettingsManager.shared.getHotkeyString(for: hotkey.actionId ?? "") ?? "Key(\(keyCode))"
     }
 }
 
 struct ShortcutHandlerView: NSViewRepresentable {
     @Binding var isRecording: Bool
-    @Binding var keyData: [UInt32]
+    @Binding var hotkey: CustomHotkey
     
     func makeNSView(context: Context) -> NSView {
         let view = ShortcutNSView()
         view.onKey = { code, mods in
             if isRecording {
-                keyData = [code, mods]
+                hotkey.keyCode = code
+                hotkey.modifiers = mods
                 isRecording = false
-                // Notify AppDelegate to re-register
+                // Notify to re-register
                 DispatchQueue.main.async {
-                    (NSApp.delegate as? AppDelegate)?.setupHotkeys()
+                    HotkeyManager.shared.refreshCustomHotkeys()
                 }
             }
         }
@@ -109,12 +57,8 @@ struct ShortcutHandlerView: NSViewRepresentable {
 
 class ShortcutNSView: NSView {
     var onKey: ((UInt32, UInt32) -> Void)?
-    
     override var acceptsFirstResponder: Bool { true }
-    
-    override func viewDidMoveToWindow() {
-        window?.makeFirstResponder(self)
-    }
+    override func viewDidMoveToWindow() { window?.makeFirstResponder(self) }
     
     override func keyDown(with event: NSEvent) {
         let keyCode = UInt32(event.keyCode)
@@ -123,7 +67,6 @@ class ShortcutNSView: NSView {
         if event.modifierFlags.contains(.option) { modifiers |= 0x0800 }
         if event.modifierFlags.contains(.shift) { modifiers |= 0x0200 }
         if event.modifierFlags.contains(.control) { modifiers |= 0x0400 }
-        
         onKey?(keyCode, modifiers)
     }
 }

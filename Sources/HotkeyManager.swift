@@ -34,31 +34,48 @@ class HotkeyManager {
         }, 1, &eventType, ptr, nil)
     }
     
-    func register(keyCode: UInt32, modifiers: UInt32, id: UInt32, block: @escaping () -> Void) {
-        // Unregister if already exists
-        if let oldRef = registeredRefs[id] {
-            UnregisterEventHotKey(oldRef)
+    func refreshCustomHotkeys() {
+        // Unregister everything first
+        for ref in registeredRefs.values {
+            UnregisterEventHotKey(ref)
         }
+        registeredRefs.removeAll()
+        hotkeys.removeAll()
         
-        hotkeys[id] = block
-        
-        var hotKeyID = EventHotKeyID()
-        hotKeyID.signature = OSType(0x4d434842) // 'MCHB'
-        hotKeyID.id = id
-        
-        var hotKey: EventHotKeyRef?
-        let status = RegisterEventHotKey(keyCode, modifiers, hotKeyID, GetApplicationEventTarget(), 0, &hotKey)
-        
-        if status == noErr, let ref = hotKey {
-            registeredRefs[id] = ref
+        let settings = SettingsManager.shared
+        for hk in settings.customHotkeys {
+            if let keyCode = hk.keyCode, let modifiers = hk.modifiers, let actionId = hk.actionId {
+                register(keyCode: keyCode, modifiers: modifiers, id: UInt32(hk.id)) {
+                    self.dispatchAction(actionId: actionId)
+                }
+            }
         }
     }
     
-    func unregister(id: UInt32) {
-        if let ref = registeredRefs[id] {
-            UnregisterEventHotKey(ref)
-            registeredRefs.removeValue(forKey: id)
-            hotkeys.removeValue(forKey: id)
+    private func dispatchAction(actionId: String) {
+        DispatchQueue.main.async {
+            switch actionId {
+            case "screenshot": (NSApp.delegate as? AppDelegate)?.triggerScreenshot()
+            case "ocr": OCRManager.shared.recognizeTextFromScreen { _ in }
+            case "translate": (NSApp.delegate as? AppDelegate)?.translateSelectedText()
+            case "speech_to_text": SpeechManager.shared.toggleRecording()
+            case "pick_color": SettingsManager.shared.pickColor()
+            case "anti_sleep": SettingsManager.shared.toggleAwake()
+            case "json_format": _ = SettingsManager.shared.formatJSON()
+            case "science_calc": (NSApp.delegate as? AppDelegate)?.showSmartCalc(tab: 0)
+            case "unit_calc": (NSApp.delegate as? AppDelegate)?.showSmartCalc(tab: 1)
+            case "currency_calc": (NSApp.delegate as? AppDelegate)?.showSmartCalc(tab: 2)
+            default: break
+            }
         }
+    }
+    
+    func register(keyCode: UInt32, modifiers: UInt32, id: UInt32, block: @escaping () -> Void) {
+        if let oldRef = registeredRefs[id] { UnregisterEventHotKey(oldRef) }
+        hotkeys[id] = block
+        var hotKeyID = EventHotKeyID(); hotKeyID.signature = OSType(0x4d434842); hotKeyID.id = id
+        var hotKey: EventHotKeyRef?
+        let status = RegisterEventHotKey(keyCode, modifiers, hotKeyID, GetApplicationEventTarget(), 0, &hotKey)
+        if status == noErr, let ref = hotKey { registeredRefs[id] = ref }
     }
 }

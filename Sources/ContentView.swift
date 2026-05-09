@@ -269,18 +269,50 @@ struct SettingsView: View {
                     .padding(.horizontal, 24)
                 
                 VStack(spacing: 0) {
-                    SettingsRow(icon: "camera.fill", title: "截图快捷键", subtitle: "设置截图的自定义按键", color: .red) {
-                        ShortcutRecorderView(keyData: $settings.screenshotHotkey)
+                    ForEach(0..<settings.customHotkeys.count, id: \.self) { index in
+                        SettingsRow(icon: "keyboard", title: "自定义快捷键 \(index + 1)", subtitle: settings.getActionName(for: settings.customHotkeys[index].actionId), color: .accentColor) {
+                            HStack {
+                                Picker("", selection: $settings.customHotkeys[index].actionId) {
+                                    Text("未设置").tag(String?.none)
+                                    Section(header: Text("创作流")) {
+                                        Text("屏幕截图").tag(Optional("screenshot"))
+                                        Text("文字识别").tag(Optional("ocr"))
+                                        Text("多语言翻译").tag(Optional("translate"))
+                                        Text("语音听写").tag(Optional("speech_to_text"))
+                                        Text("宇宙文档转换").tag(Optional("doc_convert"))
+                                        Text("全能文档合并").tag(Optional("merge_docs"))
+                                    }
+                                    Section(header: Text("剪辑增强")) {
+                                        Text("XML版本降级").tag(Optional("xml_downgrade"))
+                                        Text("库缓存清理").tag(Optional("clean_cache"))
+                                        Text("音频标准化").tag(Optional("normalize_audio"))
+                                        Text("万能图像处理").tag(Optional("image_process"))
+                                        Text("全网媒体解析").tag(Optional("media_download"))
+                                    }
+                                    Section(header: Text("生产力")) {
+                                        Text("屏幕取色").tag(Optional("pick_color"))
+                                        Text("屏幕防休眠").tag(Optional("anti_sleep"))
+                                        Text("JSON格式化").tag(Optional("json_format"))
+                                        Text("科学计算器").tag(Optional("science_calc"))
+                                        Text("单位换算").tag(Optional("unit_calc"))
+                                        Text("汇率系统").tag(Optional("currency_calc"))
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                                .frame(width: 120)
+                                
+                                ShortcutRecorderView(hotkey: $settings.customHotkeys[index])
+                            }
+                        }
+                        if index < 4 { Divider().padding(.leading, 56) }
                     }
-                    Divider().padding(.leading, 56)
-                    SettingsRow(icon: "viewfinder", title: "OCR 快捷键", subtitle: "设置文字识别按键", color: .blue) {
-                        ShortcutRecorderView(keyData: $settings.ocrHotkey)
-                    }
-                    Divider().padding(.leading, 56)
-                    SettingsRow(icon: "character.bubble.fill", title: "翻译快捷键", subtitle: "设置剪贴板翻译按键", color: .green) {
-                        ShortcutRecorderView(keyData: $settings.translateHotkey)
-                    }
-                    Divider().padding(.leading, 56)
+                }
+                .background(Color(NSColor.controlBackgroundColor).opacity(0.6))
+                .cornerRadius(16)
+                .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+                .padding(.horizontal, 24)
+
+                VStack(spacing: 0) {
                     SettingsRow(icon: "folder.fill", title: lang.t("set_save_path"), subtitle: settings.savePath, color: .orange) {
                         Button(action: { settings.selectSaveDirectory() }) {
                             Text("更改").font(.caption).fontWeight(.bold).padding(.horizontal, 12).padding(.vertical, 6).background(Color.accentColor).foregroundColor(.white).cornerRadius(6)
@@ -300,6 +332,7 @@ struct SettingsView: View {
                 .cornerRadius(16)
                 .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
                 .padding(.horizontal, 24)
+                .padding(.bottom, 24)
             }
         }
     }

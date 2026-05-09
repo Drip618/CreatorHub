@@ -47,23 +47,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func setupHotkeys() {
-        let settings = SettingsManager.shared
-        
-        HotkeyManager.shared.register(keyCode: settings.screenshotHotkey[0], modifiers: settings.screenshotHotkey[1], id: 1) {
-            self.triggerScreenshot()
-        }
-        
-        HotkeyManager.shared.register(keyCode: settings.ocrHotkey[0], modifiers: settings.ocrHotkey[1], id: 2) {
-            OCRManager.shared.recognizeTextFromScreen { result in
-                if let res = result {
-                    FloatingWindowManager.shared.show(title: "文字识别结果", text: res)
-                }
-            }
-        }
-        
-        HotkeyManager.shared.register(keyCode: settings.translateHotkey[0], modifiers: settings.translateHotkey[1], id: 3) {
-            self.translateSelectedText()
-        }
+        HotkeyManager.shared.refreshCustomHotkeys()
     }
     
     func translateSelectedText() {
@@ -139,6 +123,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         task.launch()
+    }
+    
+    func showSmartCalc(tab: Int) {
+        let titles = ["科学计算器", "万能单位换算器", "全球实时汇率系统"]
+        let heights: [CGFloat] = [780, 680, 680]
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: heights[tab]),
+                              styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView], backing: .buffered, defer: false)
+        window.center(); window.title = titles[tab]; window.titlebarAppearsTransparent = true; window.titleVisibility = .hidden
+        window.isMovableByWindowBackground = true; window.isReleasedWhenClosed = false
+        window.contentView = NSHostingView(rootView: SmartCalculatorView(initialTab: tab))
+        window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
     }
     
     func setupStatusBar() {
