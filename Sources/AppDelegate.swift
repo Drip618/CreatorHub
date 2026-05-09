@@ -116,6 +116,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         task.arguments = ["-i", tempUrl.path]
         task.terminationHandler = { _ in
             if FileManager.default.fileExists(atPath: tempUrl.path) {
+                // Copy to clipboard automatically
+                if let image = NSImage(contentsOf: tempUrl) {
+                    let pb = NSPasteboard.general
+                    pb.clearContents()
+                    pb.writeObjects([image])
+                }
+                
+                // Still open in preview for user convenience
                 let openTask = Process()
                 openTask.launchPath = "/usr/bin/open"
                 openTask.arguments = ["-a", "Preview", tempUrl.path]

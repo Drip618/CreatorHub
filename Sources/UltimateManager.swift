@@ -17,7 +17,8 @@ class UltimateManager: ObservableObject {
         case extractFrames
         case transcodeToMP4
         case delogo(rects: [CGRect])
-        case audioPurify // New: Vocal removal/Audio cleaning
+        case audioPurify
+        case customTranscode(res: String, format: String, quality: String)
     }
     
     func processVideo(url: URL, action: FFmpegAction, completion: @escaping (Bool, String) -> Void) {
@@ -53,12 +54,28 @@ class UltimateManager: ObservableObject {
             arguments = ["-i", url.path, "-c:v", "copy", "-c:a", "aac", "-y", saveUrl.appendingPathComponent(outputFileName).path]
         case .delogo(let rects):
             outputFileName = "高清去水印_\(Int(Date().timeIntervalSince1970)).mp4"
-            // Use band=10 for smoother edges, avoids the 'mosaic' look
             let filterString = rects.map { "delogo=x=\(Int($0.origin.x)):y=\(Int($0.origin.y)):w=\(Int($0.size.width)):h=\(Int($0.size.height)):band=10" }.joined(separator: ",")
             arguments = ["-i", url.path, "-vf", filterString, "-c:a", "copy", "-y", saveUrl.appendingPathComponent(outputFileName).path]
         case .audioPurify:
             outputFileName = "音频净化_\(Int(Date().timeIntervalSince1970)).mp3"
             arguments = ["-i", url.path, "-af", "anlmdn,pan=stereo|c0=c0-c1|c1=c1-c0", "-q:a", "0", "-y", saveUrl.appendingPathComponent(outputFileName).path]
+        case .customTranscode(let res, let format, let quality):
+            let ext = format.lowercased()
+            outputFileName = "创作转换_\(Int(Date().timeIntervalSince1970)).\(ext)"
+            var args = ["-i", url.path]
+            if res != "original" {
+                let h = res.replacingOccurrences(of: "p", with: "")
+                args += ["-vf", "scale=-2:\(h)"]
+            }
+            if ext == "gif" {
+                args += ["-vf", "fps=15,scale=480:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse"]
+            } else if ext == "mov" {
+                args += ["-c:v", "prores_ks", "-profile:v", "3"]
+            } else {
+                args += ["-c:v", "libx264", "-preset", quality.lowercased(), "-crf", "23"]
+            }
+            args += ["-y", saveUrl.appendingPathComponent(outputFileName).path]
+            arguments = args
         }
         
         let task = Process()
@@ -71,7 +88,7 @@ class UltimateManager: ObservableObject {
                 if process.terminationStatus == 0 {
                     completion(true, "处理成功: \(outputFileName)")
                 } else {
-                    completion(false, "引擎处理失败，请检查参数")
+                    completion(false, "引擎处理失败")
                 }
             }
         }
@@ -95,19 +112,12 @@ class UltimateManager: ObservableObject {
             let context = CIContext()
             
             for rect in rects {
-                // High Precision Patch Reconstruction
-                // 1. Create a search region around the target rect
                 let searchRect = rect.insetBy(dx: -rect.width, dy: -rect.height).intersection(ciImage.extent)
-                
-                // 2. Sample textures from the search region
                 let searchImage = currentOutput.cropped(to: searchRect)
-                
-                // 3. Use CIMedianFilter to smooth the target area first
                 let medianFilter = CIFilter(name: "CIMedianFilter")!
                 medianFilter.setValue(currentOutput, forKey: kCIInputImageKey)
                 guard let smoothed = medianFilter.outputImage?.cropped(to: ciImage.extent) else { continue }
                 
-                // 4. Advanced Texture Blend: Mix smoothed area with offset samples to simulate texture
                 let offsetFilter = CIFilter(name: "CIAffineClamp")!
                 let transform = CGAffineTransform(translationX: 10, y: 10)
                 offsetFilter.setValue(searchImage.transformed(by: transform), forKey: kCIInputImageKey)
@@ -117,76 +127,50 @@ class UltimateManager: ObservableObject {
                 let whiteBox = CIImage(color: .white).cropped(to: rect)
                 let combinedMask = whiteBox.composited(over: maskImage)
                 
-                // Blend smoothed base with texture sample
                 let blendFilter = CIFilter(name: "CIBlendWithMask")!
                 blendFilter.setValue(textureSample, forKey: kCIInputImageKey)
                 blendFilter.setValue(smoothed, forKey: kCIInputBackgroundImageKey)
                 blendFilter.setValue(combinedMask, forKey: kCIInputMaskImageKey)
                 
-                if let nextOutput = blendFilter.outputImage {
-                    currentOutput = nextOutput
-                }
+                if let nextOutput = blendFilter.outputImage { currentOutput = nextOutput }
             }
             
             let outputFileName = "无损修补_\(Int(Date().timeIntervalSince1970)).jpg"
             let destination = SettingsManager.shared.saveUrl.appendingPathComponent(outputFileName)
             
             if let jpegData = context.jpegRepresentation(of: currentOutput, colorSpace: CGColorSpaceCreateDeviceRGB(), options: [:]) {
-                do {
-                    try jpegData.write(to: destination)
-                    DispatchQueue.main.async { completion(true, "图片修补成功: \(outputFileName)") }
-                } catch {
-                    DispatchQueue.main.async { completion(false, "保存失败") }
-                }
+                try? jpegData.write(to: destination)
+                DispatchQueue.main.async { completion(true, "图片修补成功: \(outputFileName)") }
             }
         }
     }
     
     // MARK: - Pandoc Document Conversion
-    enum PandocAction {
-        case mdToWord
-        case wordToMd
-        case htmlToMd
-    }
-    
+    enum PandocAction { case mdToWord; case wordToMd; case htmlToMd }
     func processDocument(url: URL, action: PandocAction, completion: @escaping (Bool, String) -> Void) {
         guard let pandocPath = Bundle.main.path(forResource: "pandoc", ofType: "") else {
-            completion(false, "Pandoc 引擎未找到")
-            return
+            completion(false, "Pandoc 引擎未找到"); return
         }
-        
         DispatchQueue.main.async { self.isProcessing = true }
-        
         let outputFileName: String
         switch action {
         case .mdToWord: outputFileName = "转换文档_\(Int(Date().timeIntervalSince1970)).docx"
         case .wordToMd: outputFileName = "转换文档_\(Int(Date().timeIntervalSince1970)).md"
         case .htmlToMd: outputFileName = "转换文档_\(Int(Date().timeIntervalSince1970)).md"
         }
-        
         let destination = SettingsManager.shared.saveUrl.appendingPathComponent(outputFileName)
-        
         let task = Process()
         task.launchPath = pandocPath
         task.arguments = ["-s", url.path, "-o", destination.path]
-        
         task.terminationHandler = { process in
             DispatchQueue.main.async {
                 self.isProcessing = false
-                if process.terminationStatus == 0 {
-                    completion(true, "文档转化成功: \(outputFileName)")
-                } else {
-                    completion(false, "Pandoc 转换失败")
-                }
+                completion(process.terminationStatus == 0, process.terminationStatus == 0 ? "文档转化成功: \(outputFileName)" : "转换失败")
             }
         }
-        
-        do { try task.run() } catch {
-            DispatchQueue.main.async { self.isProcessing = false; completion(false, "Pandoc 引擎启动失败") }
-        }
+        try? task.run()
     }
     
-    // MARK: - Video Editor Special Tools
     func cleanFCPXCache(urls: [URL], completion: @escaping (Int64) -> Void) {
         DispatchQueue.global(qos: .default).async {
             var freedSpace: Int64 = 0
@@ -195,9 +179,7 @@ class UltimateManager: ObservableObject {
                 let enumerator = fm.enumerator(at: url, includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey], options: [.skipsHiddenFiles])
                 while let fileUrl = enumerator?.nextObject() as? URL {
                     if fileUrl.path.contains("Render Files") || fileUrl.path.contains("Analysis Files") || fileUrl.path.contains("Transcoded Media") {
-                        if let attrs = try? fm.attributesOfItem(atPath: fileUrl.path) {
-                            freedSpace += (attrs[.size] as? Int64) ?? 0
-                        }
+                        if let attrs = try? fm.attributesOfItem(atPath: fileUrl.path) { freedSpace += (attrs[.size] as? Int64) ?? 0 }
                         try? fm.removeItem(at: fileUrl)
                     }
                 }
@@ -207,38 +189,15 @@ class UltimateManager: ObservableObject {
     }
     
     func normalizeLoudness(url: URL, completion: @escaping (Bool, String) -> Void) {
-        guard let ffmpegPath = Bundle.main.path(forResource: "ffmpeg", ofType: "") else {
-            completion(false, "FFmpeg 引擎缺失")
-            return
-        }
+        guard let ffmpegPath = Bundle.main.path(forResource: "ffmpeg", ofType: "") else { completion(false, "引擎缺失"); return }
         let outName = "标准化音频_\(Int(Date().timeIntervalSince1970)).mp3"
         let outPath = SettingsManager.shared.saveUrl.appendingPathComponent(outName).path
-        
-        // Target -14 LUFS (YouTube/Spotify standard)
         let task = Process()
         task.launchPath = ffmpegPath
         task.arguments = ["-i", url.path, "-af", "loudnorm=I=-14:LRA=11:tp=-1", "-y", outPath]
-        
         task.terminationHandler = { proc in
-            DispatchQueue.main.async { completion(proc.terminationStatus == 0, proc.terminationStatus == 0 ? "标准化完成: \(outName)" : "处理失败") }
+            DispatchQueue.main.async { completion(proc.terminationStatus == 0, proc.terminationStatus == 0 ? "标准化完成: \(outName)" : "失败") }
         }
         try? task.run()
-    }
-    
-    func stripEXIF(from imageUrls: [URL], completion: @escaping (Int) -> Void) {
-        DispatchQueue.global(qos: .userInitiated).async {
-            var successCount = 0
-            for url in imageUrls {
-                guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-                      let type = CGImageSourceGetType(source) else { continue }
-                let outputFileName = "隐私净化_\(url.lastPathComponent)"
-                let destination = SettingsManager.shared.saveUrl.appendingPathComponent(outputFileName)
-                guard let dest = CGImageDestinationCreateWithURL(destination as CFURL, type, 1, nil) else { continue }
-                
-                CGImageDestinationAddImageFromSource(dest, source, 0, [kCGImageDestinationMetadata as String: NSNull()] as CFDictionary)
-                if CGImageDestinationFinalize(dest) { successCount += 1 }
-            }
-            DispatchQueue.main.async { completion(successCount) }
-        }
     }
 }

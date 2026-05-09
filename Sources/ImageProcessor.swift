@@ -10,7 +10,7 @@ enum ImageAction {
     case resize(scale: Double)
     case crop(ratio: Double) // width/height
     case sliceGrid(rows: Int, columns: Int)
-    case idPhotoMaker
+    case idPhotoMaker(color: CIColor)
 }
 
 class ImageProcessor: ObservableObject {
@@ -66,8 +66,8 @@ class ImageProcessor: ObservableObject {
                     finalImages = [cgImage]
                 case .sliceGrid(let rows, let cols):
                     finalImages = self.sliceImage(cgImage, rows: rows, columns: cols)
-                case .idPhotoMaker:
-                    if let idPhoto = self.createIDPhoto(cgImage) {
+                case .idPhotoMaker(let color):
+                    if let idPhoto = self.createIDPhoto(cgImage, bgColor: color) {
                         finalImages = [idPhoto]
                     }
                 }
@@ -168,7 +168,7 @@ class ImageProcessor: ObservableObject {
         return cgImage.cropping(to: cropRect)
     }
     
-    private func createIDPhoto(_ cgImage: CGImage) -> CGImage? {
+    private func createIDPhoto(_ cgImage: CGImage, bgColor: CIColor) -> CGImage? {
         if #available(macOS 12.0, *) {
             let request = VNGeneratePersonSegmentationRequest()
             request.qualityLevel = .accurate
@@ -187,8 +187,7 @@ class ImageProcessor: ObservableObject {
                 let scaleY = originalImage.extent.height / maskImage.extent.height
                 let scaledMask = maskImage.transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
                 
-                let blueColor = CIColor(red: 0.26, green: 0.55, blue: 0.90) // Standard ID Photo Blue
-                let background = CIImage(color: blueColor).cropped(to: originalImage.extent)
+                let background = CIImage(color: bgColor).cropped(to: originalImage.extent)
                 
                 let blendFilter = CIFilter(name: "CIBlendWithMask")!
                 blendFilter.setValue(originalImage, forKey: kCIInputImageKey)

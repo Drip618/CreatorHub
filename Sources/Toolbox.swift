@@ -1,6 +1,8 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
-struct ToolItem {
+struct ToolItem: Identifiable {
+    let id = UUID()
     let icon: String
     let title: String
     let subtitle: String
@@ -9,59 +11,41 @@ struct ToolItem {
 }
 
 struct ToolboxView: View {
-    @ObservedObject var lang = LanguageManager.shared
-    @ObservedObject var speechManager = SpeechManager.shared
-    @ObservedObject var ocrManager = OCRManager.shared
-    @ObservedObject var imageProcessor = ImageProcessor.shared
-    @ObservedObject var ultimateManager = UltimateManager.shared
     @ObservedObject var settings = SettingsManager.shared
-    @State private var showMessage: String?
+    @ObservedObject var ultimateManager = UltimateManager.shared
+    @ObservedObject var imageProcessor = ImageProcessor.shared
+    @State private var showMessage: String? = nil
+    
+    // Config Sheet State
+    @State private var activeConfigType: ConfigType? = nil
+    @State private var selectedUrls: [URL] = []
+    @State private var isConfigPresented: Bool = false
     
     var body: some View {
-        VStack(spacing: 0) {
+        ZStack {
             ScrollView {
-                VStack(spacing: 24) {
-                    ToolboxSection(title: "🖥️ 屏幕与图像", tools: [
-                        ToolItem(icon: "macwindow.badge.plus", title: "屏幕截图", subtitle: "全屏捕捉", actionId: "screenshot", action: { triggerScreenshot() }),
-                        ToolItem(icon: "text.viewfinder", title: ocrManager.isRecognizing ? "识别中..." : "文字识别", subtitle: "提取文本", actionId: "ocr", action: {
-                            ocrManager.recognizeTextFromScreen { result in showMessage = result != nil ? "识别完成" : "识别失败" }
-                        }),
-                        ToolItem(icon: "lock.shield", title: "图片隐私净化", subtitle: "清除 EXIF 隐私数据", actionId: "image_privacy", action: {
-                            let panel = NSOpenPanel(); panel.allowsMultipleSelection = true; panel.canChooseFiles = true
-                            if #available(macOS 11.0, *) { panel.allowedContentTypes = [.image] }
-                            if panel.runModal() == .OK, !panel.urls.isEmpty {
-                                ultimateManager.stripEXIF(from: panel.urls) { count in showMessage = "成功净化 \(count) 张图片！" }
-                            }
-                        }),
-                        ToolItem(icon: imageProcessor.isProcessing ? "hourglass" : "photo.stack", title: imageProcessor.isProcessing ? "正在处理..." : "万能图像处理", subtitle: "批量转换尺寸/格式", actionId: "image_process", action: { showImageProcessorDialog() }),
-                        ToolItem(icon: "pencil.and.outline", title: "图像编辑与裁剪", subtitle: "快速标记与修图", actionId: "image_edit", action: { openPreviewEdit() })
+                VStack(spacing: 25) {
+                    ToolboxSection(title: "🎬 创作流 (Creative Pro)", tools: [
+                        ToolItem(icon: "camera.viewfinder", title: "屏幕截图", subtitle: "自动保存并拷贝至剪贴板", actionId: "screenshot", action: { triggerScreenshot() }),
+                        ToolItem(icon: "text.viewfinder", title: "文字识别", subtitle: "一键提取屏幕文字", actionId: "ocr", action: { triggerScreenshot() }),
+                        ToolItem(icon: "character.book.closed", title: "多语言翻译", subtitle: "瞬时文档/网页翻译", actionId: "translate", action: { triggerScreenshot() }),
+                        ToolItem(icon: "waveform", title: "音频标准化", subtitle: "一键处理音量平衡 (-14 LUFS)", actionId: "normalize_audio", action: { normalizeAudioFlow() }),
+                        ToolItem(icon: "arrow.triangle.2.circlepath.video", title: "万能视频转码", subtitle: "自定义分辨率/格式/画质", actionId: "video_transcode", action: { pickFiles(type: .videoTranscode) }),
+                        ToolItem(icon: "video.slash", title: "高清视频去水印", subtitle: "智能补全，不留痕迹", actionId: "media_download", action: { showFFmpegDialog() })
                     ])
                     
-                    ToolboxSection(title: "🎬 多媒体引擎", tools: [
-                        ToolItem(icon: ultimateManager.isProcessing ? "hourglass" : "film.circle.fill", title: ultimateManager.isProcessing ? "处理中..." : "终极视频工坊", subtitle: "转码、抽帧、去水印", actionId: "ffmpeg_process", action: { showFFmpegDialog() }),
-                        ToolItem(icon: DownloadManager.shared.isDownloading ? "arrow.down.circle.fill" : "arrow.down.circle", title: DownloadManager.shared.isDownloading ? "解析中..." : "全网媒体解析", subtitle: "解析并下载素材", actionId: "media_download", action: { showDownloadDialog() })
+                    ToolboxSection(title: "🖼️ 影像工坊 (Image Lab)", tools: [
+                        ToolItem(icon: "photo.on.rectangle", title: "万能图像处理", subtitle: "批量转换尺寸与格式", actionId: "image_process", action: { pickFiles(type: .imageProcess) }),
+                        ToolItem(icon: "person.crop.square", title: "证件照智能换底", subtitle: "自动抠图，自由选色", actionId: "id_photo", action: { pickFiles(type: .idPhoto) }),
+                        ToolItem(icon: "square.grid.3x3", title: "九宫格裁剪", subtitle: "一键生成朋友圈/封面图", actionId: "grid_slice", action: { pickFiles(type: .gridSlice) }),
+                        ToolItem(icon: "shield.checkerboard", title: "隐私净化", subtitle: "一键清除 EXIF/GPS 信息", actionId: "clean_exif", action: { pickFiles(type: .imageProcess) })
                     ])
                     
-                    ToolboxSection(title: "📄 文档创作流", tools: [
-                        ToolItem(icon: speechManager.isRecording ? "mic.fill" : "mic", title: speechManager.isRecording ? "正在听写..." : "语音听写", subtitle: "实时语音转文字", actionId: "speech_to_text", action: {
-                            speechManager.toggleRecording(); if speechManager.isRecording { showMessage = "正在倾听..." }
-                        }),
-                        ToolItem(icon: TranslateManager.shared.isTranslating ? "globe" : "character.book.closed", title: TranslateManager.shared.isTranslating ? "正在翻译..." : "多语言翻译", subtitle: "瞬时互译", actionId: "translate", action: {
-                            (NSApp.delegate as? AppDelegate)?.translateSelectedText()
-                        }),
-                        ToolItem(icon: ultimateManager.isProcessing ? "hourglass" : "doc.text.magnifyingglass", title: ultimateManager.isProcessing ? "转换中..." : "宇宙文档转换", subtitle: "Word/MD 格式互转", actionId: "doc_convert", action: { showPandocDialog() }),
-                        ToolItem(icon: DocumentManager.shared.isProcessing ? "doc.on.doc.fill" : "doc.on.doc", title: DocumentManager.shared.isProcessing ? "合并中..." : "全能文档/表格合并", subtitle: "批量合并文件数据", actionId: "merge_docs", action: { mergeDocuments() })
-                    ])
-                    
-                    ToolboxSection(title: "🎬 创作增强 (Pro Workflow)", tools: [
-                        ToolItem(icon: "doc.on.doc.fill", title: "XML 版本降级", subtitle: "兼容旧版 FCPX/PR", actionId: "xml_downgrade", action: { downgradeXMLFlow() }),
-                        ToolItem(icon: "folder.badge.minus", title: "库缓存智能清理", subtitle: "清理渲染/代理文件", actionId: "clean_cache", action: { cleanCacheFlow() }),
-                        ToolItem(icon: "waveform.circle.fill", title: "音频音量标准化", subtitle: "自动平衡 -14 LUFS", actionId: "normalize_audio", action: { normalizeAudioFlow() })
-                    ])
-                    
-                    ToolboxSection(title: "🔄 万能转换 (Media Pro)", tools: [
-                        ToolItem(icon: "bolt.fill", title: "极速批量转换", subtitle: "ProRes 级转码体验", actionId: "batch_transcode", action: { showFFmpegDialog() }),
-                        ToolItem(icon: "music.note.list", title: "无损音频提取", subtitle: "从视频提取原声", actionId: "audio_extract", action: { showFFmpegDialog() })
+                    ToolboxSection(title: "📄 极速工作流 (Workflow)", tools: [
+                        ToolItem(icon: "doc.text.inverse", title: "XML 版本降级", subtitle: "适配 FCPX/PR 低版本工程", actionId: "xml_downgrade", action: { downgradeXMLFlow() }),
+                        ToolItem(icon: "doc.on.doc", title: "全能文档合并", subtitle: "Word/PDF/MD 无损合并", actionId: "merge_docs", action: { mergeDocuments() }),
+                        ToolItem(icon: "trash", title: "库缓存清理", subtitle: "释放磁盘 FCPX/PR 缓存", actionId: "clean_cache", action: { cleanCacheFlow() }),
+                        ToolItem(icon: "character.cursor.ibeam", title: "宇宙文档转换", subtitle: "Word/PDF/MD 自由互转", actionId: "doc_convert", action: { showPandocDialog() })
                     ])
 
                     ToolboxSection(title: "📊 智能生产力", tools: [
@@ -81,15 +65,62 @@ struct ToolboxView: View {
                     .onAppear { DispatchQueue.main.asyncAfter(deadline: .now() + 2) { showMessage = nil } }
             }
         }
+        .sheet(isPresented: $isConfigPresented) {
+            if let type = activeConfigType {
+                ToolConfigView(type: type, urls: selectedUrls, isPresented: $isConfigPresented) { config in
+                    executeWithConfig(type: type, config: config)
+                }
+            }
+        }
     }
     
-    // Actions (rest omitted for brevity, but I'll include the necessary parts)
+    // Actions
     private func triggerScreenshot() { (NSApp.delegate as? AppDelegate)?.triggerScreenshot() }
-    private func openPreviewEdit() { let panel = NSOpenPanel(); if panel.runModal() == .OK, let url = panel.url { NSWorkspace.shared.open(url) } }
+    
+    private func pickFiles(type: ConfigType) {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = true
+        if type == .videoTranscode {
+            panel.allowedContentTypes = [.movie, .video]
+        } else {
+            panel.allowedContentTypes = [.image]
+        }
+        
+        if panel.runModal() == .OK {
+            self.selectedUrls = panel.urls
+            self.activeConfigType = type
+            self.isConfigPresented = true
+        }
+    }
+    
+    private func executeWithConfig(type: ConfigType, config: Any) {
+        switch type {
+        case .imageProcess:
+            if let (scale, format) = config as? (Double, UTType) {
+                imageProcessor.processImages(urls: selectedUrls, action: .resize(scale: scale), saveTo: settings.saveUrl) { _ in showMessage = "图片处理完成" }
+            }
+        case .videoTranscode:
+            if let (res, format, quality) = config as? (String, String, String) {
+                for url in selectedUrls {
+                    ultimateManager.processVideo(url: url, action: .customTranscode(res: res, format: format, quality: quality)) { _, m in showMessage = m }
+                }
+            }
+        case .idPhoto:
+            if let color = config as? Color {
+                let nsColor = NSColor(color)
+                if let ciColor = CIColor(color: nsColor) {
+                    imageProcessor.processImages(urls: selectedUrls, action: .idPhotoMaker(color: ciColor), saveTo: settings.saveUrl) { _ in showMessage = "证件照制作完成" }
+                }
+            }
+        case .gridSlice:
+            if let (r, c) = config as? (Int, Int) {
+                imageProcessor.processImages(urls: selectedUrls, action: .sliceGrid(rows: r, columns: c), saveTo: settings.saveUrl) { _ in showMessage = "九宫格裁剪完成" }
+            }
+        }
+    }
+    
     private func showFFmpegDialog() { let panel = NSOpenPanel(); if panel.runModal() == .OK, let url = panel.url { ultimateManager.processVideo(url: url, action: .compress) { s, m in showMessage = m } } }
-    private func showDownloadDialog() { showMessage = "请在剪贴板粘贴视频链接" }
     private func showPandocDialog() { let panel = NSOpenPanel(); if panel.runModal() == .OK, let url = panel.url { ultimateManager.processDocument(url: url, action: .mdToWord) { s, m in showMessage = m } } }
-    private func showImageProcessorDialog() { let panel = NSOpenPanel(); panel.allowsMultipleSelection = true; if panel.runModal() == .OK { imageProcessor.processImages(urls: panel.urls, action: .resize(scale: 0.5), saveTo: settings.saveUrl) { _ in showMessage = "图片处理完成" } } }
     private func cleanCacheFlow() { let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false; if panel.runModal() == .OK { ultimateManager.cleanFCPXCache(urls: panel.urls) { bytes in showMessage = "已清理 \(bytes / 1024 / 1024)MB 缓存文件" } } }
     private func normalizeAudioFlow() { let panel = NSOpenPanel(); panel.allowedContentTypes = [.audio, .movie].compactMap { $0 }; if panel.runModal() == .OK, let url = panel.url { ultimateManager.normalizeLoudness(url: url) { s, m in showMessage = m } } }
     private func mergeDocuments() { let panel = NSOpenPanel(); panel.allowsMultipleSelection = true; panel.canChooseFiles = true; if panel.runModal() == .OK { DocumentManager.shared.mergeFiles(urls: panel.urls) { success, msg in showMessage = msg } } }
@@ -99,39 +130,32 @@ struct ToolboxView: View {
 struct ToolboxSection: View {
     let title: String; let tools: [ToolItem]
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title).font(.headline).foregroundColor(.secondary).padding(.leading, 8)
-            VStack(spacing: 0) {
-                ForEach(tools.indices, id: \.self) { i in
-                    ToolRow(item: tools[i])
-                    if i < tools.count - 1 { Divider().padding(.leading, 48) }
-                }
+        VStack(alignment: .leading, spacing: 15) {
+            Text(title).font(.system(size: 14, weight: .bold)).foregroundColor(.secondary).padding(.leading, 5)
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 15) {
+                ForEach(tools) { ToolRow(tool: $0) }
             }
-            .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
-            .cornerRadius(12)
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.1), lineWidth: 0.5))
         }
     }
 }
 
 struct ToolRow: View {
-    let item: ToolItem; @ObservedObject var settings = SettingsManager.shared; @State private var isHovered = false
+    let tool: ToolItem
+    @State private var isHovered = false
     var body: some View {
-        Button(action: item.action) {
+        Button(action: tool.action) {
             HStack(spacing: 12) {
-                Image(systemName: item.icon).font(.system(size: 18)).foregroundColor(.accentColor).frame(width: 24)
+                Image(systemName: tool.icon).font(.system(size: 20)).foregroundColor(.accentColor).frame(width: 30)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(item.title).font(.system(size: 14, weight: .medium))
-                    if !item.subtitle.isEmpty { Text(item.subtitle).font(.system(size: 10)).foregroundColor(.secondary) }
+                    Text(tool.title).font(.system(size: 13, weight: .semibold))
+                    Text(tool.subtitle).font(.system(size: 10)).foregroundColor(.secondary).lineLimit(1)
                 }
                 Spacer()
-                if let hkString = settings.getHotkeyString(for: item.actionId) {
+                if let hkString = SettingsManager.shared.getHotkeyString(for: tool.actionId) {
                     Text(hkString).font(.system(size: 10, weight: .bold, design: .monospaced)).padding(.horizontal, 6).padding(.vertical, 2).background(Color.accentColor.opacity(0.1)).foregroundColor(.accentColor).cornerRadius(4).padding(.trailing, 4)
                 }
-                Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold)).foregroundColor(.secondary.opacity(0.5))
             }
-            .padding(.horizontal, 16).padding(.vertical, 12)
-            .background(isHovered ? Color.primary.opacity(0.05) : Color.clear)
+            .padding(12).background(Color(NSColor.controlBackgroundColor).opacity(isHovered ? 0.8 : 0.4)).cornerRadius(12).overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.accentColor.opacity(isHovered ? 0.3 : 0), lineWidth: 1))
         }
         .buttonStyle(.plain).onHover { isHovered = $0 }
     }
