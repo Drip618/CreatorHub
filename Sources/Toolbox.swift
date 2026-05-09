@@ -28,7 +28,10 @@ struct ToolboxView: View {
                     ToolboxSection(title: "🎬 创作流 (Creative Pro)", tools: [
                         ToolItem(icon: "camera.viewfinder", title: "屏幕截图", subtitle: "自动保存并拷贝至剪贴板", actionId: "screenshot", action: { triggerScreenshot(mode: .normal) }),
                         ToolItem(icon: "text.viewfinder", title: "文字识别", subtitle: "一键提取屏幕文字", actionId: "ocr", action: { triggerScreenshot(mode: .ocr) }),
-                        ToolItem(icon: "character.book.closed", title: "图像翻译专家", subtitle: "截图翻译 或 选择本地图片", actionId: "translate", action: { showTranslateMenu() }),
+                        ToolItem(icon: "character.book.closed", title: "图像翻译专家", subtitle: "截图翻译 或 选择本地图片", actionId: "translate", action: { 
+                            self.activeConfigType = .translation
+                            self.isConfigPresented = true
+                        }),
                         ToolItem(icon: "waveform", title: "音频标准化", subtitle: "一键处理音量平衡 (-14 LUFS)", actionId: "normalize_audio", action: { normalizeAudioFlow() }),
                         ToolItem(icon: "video.fill", title: "万能视频转码", subtitle: "分辨率/格式/画质自由配置", actionId: "video_transcode", action: { pickFilesAsync(type: .videoTranscode) }),
                         ToolItem(icon: "video.slash", title: "视频去水印", subtitle: "智能修补，支持批量处理", actionId: "media_download", action: { showFFmpegDialogAsync() })
@@ -93,41 +96,6 @@ struct ToolboxView: View {
         }
     }
     
-    private func showTranslateMenu() {
-        let alert = NSAlert()
-        alert.messageText = "图像翻译"
-        alert.informativeText = "请选择翻译方式："
-        alert.addButton(withTitle: "屏幕截图翻译")
-        alert.addButton(withTitle: "选择本地图片")
-        alert.addButton(withTitle: "取消")
-        
-        let response = alert.runModal()
-        if response == .alertFirstButtonReturn {
-            triggerScreenshot(mode: .translate)
-        } else if response == .alertSecondButtonReturn {
-            translateImageAsync()
-        }
-    }
-    
-    private func translateImageAsync() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.image]
-        panel.begin { response in
-            if response == .OK, let url = panel.url {
-                DispatchQueue.global(qos: .userInitiated).async {
-                    // We need a helper to recognize text from a specific URL
-                    OCRManager.shared.recognizeTextFromURL(url) { text in
-                        if let t = text {
-                            TranslateManager.shared.translateText(t) { result in
-                                FloatingWindowManager.shared.show(title: "图片翻译结果", text: result ?? "翻译失败")
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
     private func triggerScreenshot(mode: AppDelegate.ScreenshotMode) { (NSApp.delegate as? AppDelegate)?.triggerScreenshot(mode: mode) }
     
     private func executeWithConfig(type: ConfigType, config: Any) {
@@ -152,6 +120,32 @@ struct ToolboxView: View {
         case .gridSlice:
             if let (r, c) = config as? (Int, Int) {
                 imageProcessor.processImages(urls: selectedUrls, action: .sliceGrid(rows: r, columns: c), saveTo: settings.saveUrl) { _ in showMessage = "多视图切割完成" }
+            }
+        case .translation:
+            if let mode = config as? String {
+                if mode == "screen" {
+                    triggerScreenshot(mode: .translate)
+                } else {
+                    translateImageAsync()
+                }
+            }
+        }
+    }
+    
+    private func translateImageAsync() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image]
+        panel.begin { response in
+            if response == .OK, let url = panel.url {
+                DispatchQueue.global(qos: .userInitiated).async {
+                    OCRManager.shared.recognizeTextFromURL(url) { text in
+                        if let t = text {
+                            TranslateManager.shared.translateText(t) { result in
+                                FloatingWindowManager.shared.show(title: "图片翻译结果", text: result ?? "翻译失败")
+                            }
+                        }
+                    }
+                }
             }
         }
     }

@@ -6,6 +6,7 @@ enum ConfigType: Equatable {
     case videoTranscode
     case idPhoto
     case gridSlice
+    case translation
 }
 
 // Grid preset templates
@@ -65,7 +66,11 @@ struct ToolConfigView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(titleText).font(.system(size: 16, weight: .bold))
-                    Text("\(urls.count) 个文件已选择").font(.caption).foregroundColor(.secondary)
+                    if type != .translation {
+                        Text("\(urls.count) 个文件已选择").font(.caption).foregroundColor(.secondary)
+                    } else {
+                        Text("请选择翻译来源").font(.caption).foregroundColor(.secondary)
+                    }
                 }
                 Spacer()
                 Button(action: { isPresented = false }) {
@@ -88,32 +93,35 @@ struct ToolConfigView: View {
                     case .videoTranscode: videoSection
                     case .idPhoto: idPhotoSection
                     case .gridSlice: gridSection
+                    case .translation: translationSection
                     }
                 }
                 .padding(24)
             }
 
-            Divider()
+            if type != .translation {
+                Divider()
 
-            // Footer
-            Button(action: handleConfirm) {
-                HStack {
-                    Image(systemName: "checkmark.circle.fill")
-                    Text("开始处理")
-                    Spacer()
-                    Text("\(urls.count) 个文件").foregroundColor(.white.opacity(0.7))
+                // Footer
+                Button(action: handleConfirm) {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                        Text("开始处理")
+                        Spacer()
+                        Text("\(urls.count) 个文件").foregroundColor(.white.opacity(0.7))
+                    }
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 13)
+                    .padding(.horizontal, 20)
+                    .background(Color.accentColor)
+                    .cornerRadius(12)
                 }
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 13)
-                .padding(.horizontal, 20)
-                .background(Color.accentColor)
-                .cornerRadius(12)
+                .buttonStyle(PlainButtonStyle())
+                .padding(.horizontal, 24)
+                .padding(.vertical, 16)
             }
-            .buttonStyle(PlainButtonStyle())
-            .padding(.horizontal, 24)
-            .padding(.vertical, 16)
         }
         .frame(width: 420)
         .background(VisualEffectView(material: .hudWindow, blendingMode: .behindWindow))
@@ -279,12 +287,33 @@ struct ToolConfigView: View {
         }
     }
 
+    private var translationSection: some View {
+        VStack(spacing: 20) {
+            Text("选择翻译方式")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.secondary)
+            
+            HStack(spacing: 20) {
+                TranslationModeButton(title: "屏幕截图翻译", subtitle: "选取屏幕任意区域进行 OCR 识别并翻译", icon: "camera.viewfinder") {
+                    isPresented = false
+                    onConfirm("screen")
+                }
+                
+                TranslationModeButton(title: "本地图片翻译", subtitle: "选择一张或多张本地图片进行批量翻译", icon: "photo.on.rectangle") {
+                    isPresented = false
+                    onConfirm("file")
+                }
+            }
+        }
+    }
+
     private var titleText: String {
         switch type {
         case .imageProcess: return "图像批量处理"
         case .videoTranscode: return "视频转码参数"
         case .idPhoto: return "证件照智能换底"
         case .gridSlice: return "多视图切割"
+        case .translation: return "图像翻译专家"
         }
     }
 
@@ -305,7 +334,48 @@ struct ToolConfigView: View {
                     onConfirm((p.rows, p.cols))
                 }
             }
+        case .translation:
+            break // Handled in section
         }
+    }
+}
+
+struct TranslationModeButton: View {
+    let title: String
+    let subtitle: String
+    let icon: String
+    let action: () -> Void
+    @State private var isHovered = false
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 32))
+                    .foregroundColor(.accentColor)
+                
+                VStack(spacing: 4) {
+                    Text(title)
+                        .font(.system(size: 14, weight: .bold))
+                    Text(subtitle)
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 140)
+            .padding()
+            .background(Color(NSColor.controlBackgroundColor).opacity(isHovered ? 0.8 : 0.4))
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.accentColor.opacity(isHovered ? 0.5 : 0), lineWidth: 2)
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+        .onHover { isHovered = $0 }
     }
 }
 
