@@ -6,24 +6,23 @@ class TranslateManager: ObservableObject {
     
     @Published var isTranslating = false
     
+    /// 读取剪贴板内容并翻译，结果通过 completion 返回（不覆盖剪贴板原文）
     func translateClipboard(completion: @escaping (String?) -> Void) {
         let pb = NSPasteboard.general
         guard let text = pb.string(forType: .string), !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             completion(nil)
             return
         }
-        
-        translate(text: text) { translatedText in
-            if let result = translatedText {
-                DispatchQueue.main.async {
-                    pb.clearContents()
-                    pb.setString(result, forType: .string)
-                    completion(result)
-                }
-            } else {
-                completion(nil)
-            }
+        translate(text: text, completion: completion)
+    }
+    
+    /// 翻译指定文本，结果通过 completion 返回（不修改剪贴板）
+    func translateText(_ text: String, completion: @escaping (String?) -> Void) {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            completion(nil)
+            return
         }
+        translate(text: text, completion: completion)
     }
     
     func translate(text: String, completion: @escaping (String?) -> Void) {

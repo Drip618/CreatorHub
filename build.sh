@@ -8,8 +8,8 @@ RESOURCES_DIR="${APP_BUNDLE}/Contents/Resources"
 
 echo "Cleaning old build..."
 rm -rf "${APP_BUNDLE}"
-rm -rf *.app
-rm -rf *.zip
+rm -f CreatorHub_Ultimate.zip
+rm -f CreatorHub_Beta_Test.zip
 
 echo "Creating App Bundle structure..."
 mkdir -p "${MACOS_DIR}"
@@ -25,8 +25,15 @@ if [ ! -f "Resources/ffmpeg" ]; then
     echo "Downloading FFmpeg..."
     curl -L "https://evermeet.cx/ffmpeg/getrelease/zip" -o "Resources/ffmpeg.zip"
     unzip -q "Resources/ffmpeg.zip" -d "Resources/"
-    rm "Resources/ffmpeg.zip"
+    rm -f "Resources/ffmpeg.zip"
     chmod +x Resources/ffmpeg
+fi
+
+# Download yt-dlp if missing
+if [ ! -f "Resources/yt-dlp" ]; then
+    echo "Downloading yt-dlp..."
+    curl -L "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos" -o "Resources/yt-dlp"
+    chmod +x Resources/yt-dlp
 fi
 
 # Download Pandoc if missing
@@ -41,8 +48,6 @@ if [ ! -f "Resources/pandoc" ]; then
         chmod +x Resources/pandoc
     fi
 fi
-
-
 
 if [ -d "Resources" ]; then
     cp -R Resources/* "${RESOURCES_DIR}/" || true
@@ -62,8 +67,18 @@ strip -S "${MACOS_DIR}/${APP_NAME}"
 echo "Signing App Bundle..."
 codesign --force --deep --sign - "${APP_BUNDLE}"
 
-echo "Creating Distribution Package..."
-zip -q -r -y "CreatorHub_Ultimate.zip" "${APP_BUNDLE}"
+echo "Removing Gatekeeper quarantine flags..."
+xattr -cr "${APP_BUNDLE}"
 
-echo "Build successful! App created at ${APP_BUNDLE}"
-echo "Distribution package ready: CreatorHub_Ultimate.zip"
+echo "Creating Distribution Packages..."
+# Full package
+zip -q -r -y "CreatorHub_Ultimate.zip" "${APP_BUNDLE}"
+# Beta test package (app + user manual)
+zip -q -r -y "CreatorHub_Beta_Test.zip" "${APP_BUNDLE}" "README_USER.md"
+
+echo ""
+echo "✅ Build successful!"
+echo "   App:          ${APP_BUNDLE}"
+echo "   Full Package: CreatorHub_Ultimate.zip"
+echo "   Beta Package: CreatorHub_Beta_Test.zip"
+echo ""

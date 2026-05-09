@@ -73,7 +73,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let pb = NSPasteboard.general
         let oldCount = pb.changeCount
         
-        // Simulate Cmd+C
+        // Simulate Cmd+C to copy selected text
         let source = CGEventSource(stateID: .hidSystemState)
         if let copyKeyDown = CGEvent(keyboardEventSource: source, virtualKey: 0x08, keyDown: true),
            let copyKeyUp = CGEvent(keyboardEventSource: source, virtualKey: 0x08, keyDown: false) {
@@ -83,34 +83,49 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             copyKeyUp.post(tap: .cghidEventTap)
         }
         
-        // Poll for clipboard update (up to 1 second)
+        // Poll for clipboard update (up to 1.5s: 15 attempts x 0.1s)
+        // Use translateText() so we don't overwrite the user's clipboard
         func pollClipboard(attempts: Int) {
-            if pb.changeCount != oldCount {
-                // Clipboard updated!
-                TranslateManager.shared.translateClipboard { result in
+            if pb.changeCount != oldCount,
+               let text = pb.string(forType: .string),
+               !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                // Clipboard was updated — translate the fresh selection
+                TranslateManager.shared.translateText(text) { result in
                     if let res = result {
-                        FloatingWindowManager.shared.show(title: "TRANSLATION", text: res)
+                        let shortSource = text.count > 40 ? String(text.prefix(40)) + "..." : text
+                        FloatingWindowManager.shared.show(title: shortSource, text: res)
                     } else {
-                        FloatingWindowManager.shared.show(title: "ERROR", text: "翻译接口未返回结果，请检查网络。")
+                        FloatingWindowManager.shared.show(title: "翻译失败", text: "请检查网络连接，或确认已开启辅助功能权限。")
                     }
                 }
-            } else if attempts < 10 {
+            } else if attempts < 15 {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     pollClipboard(attempts: attempts + 1)
                 }
             } else {
-                // If clipboard didn't change, try translating whatever is currently there as fallback
-                TranslateManager.shared.translateClipboard { result in
+                // Timeout — fall back to whatever is currently on clipboard
+                guard let text = pb.string(forType: .string),
+                      !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    FloatingWindowManager.shared.show(
+                        title: "无法获取选中内容",
+                        text: "请先在任意应用中选中文字，再按 Option+3。\n注：首次使用需在「系统设置 → 隐私与安全性 → 辅助功能」中开启 Creator Hub 权限。"
+                    )
+                    return
+                }
+                TranslateManager.shared.translateText(text) { result in
                     if let res = result {
-                        FloatingWindowManager.shared.show(title: "TRANSLATION (CLIPBOARD)", text: res)
+                        FloatingWindowManager.shared.show(title: "剪贴板翻译", text: res)
                     } else {
-                        FloatingWindowManager.shared.show(title: "ERROR", text: "未能获取到选中的文字。请确保已在「系统设置 -> 辅助功能」中允许 Creator Hub 控制电脑。")
+                        FloatingWindowManager.shared.show(title: "翻译失败", text: "请检查网络连接。")
                     }
                 }
             }
         }
         
-        pollClipboard(attempts: 0)
+        // Start polling after a brief delay to let the system process Cmd+C
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            pollClipboard(attempts: 0)
+        }
     }
     
     func triggerScreenshot() {
@@ -141,25 +156,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
             // Use a highly premium macOS native symbol
-            if let image = NSImage(systemSymbolName: "cube.transparent.fill", accessibilityDescription: "多媒体工具箱") {
+            if let image = NSImage(systemSymbolName: "cube.transparent.fill", accessibilityDescription: "Creator Hub") {
                 let config = NSImage.SymbolConfiguration(pointSize: 15, weight: .regular)
                 button.image = image.withSymbolConfiguration(config)
             } else {
-                button.title = "📸"
+                button.title = "🎬"
             }
             button.action = #selector(handleIconClick(_:))
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
-        
-        // Setup Clipboard Monitor
-        ClipboardMonitor.shared.start()
     }
     
     @objc func handleIconClick(_ sender: NSStatusBarButton) {
         guard let event = NSApp.currentEvent else { return }
         if event.type == .rightMouseUp {
             let menu = NSMenu()
-            menu.addItem(NSMenuItem(title: "退出多媒体工具箱 (Quit)", action: #selector(quitApp), keyEquivalent: "q"))
+            menu.addItem(NSMenuItem(title: "退出 Creator Hub (Quit)", action: #selector(quitApp), keyEquivalent: "q"))
             menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.height), in: sender)
         } else {
             togglePopover(sender)
@@ -202,7 +214,7 @@ class ServiceProvider: NSObject {
             let isImage = urls.contains { ["png", "jpg", "jpeg", "heic", "gif", "webp"].contains($0.pathExtension.lowercased()) }
             
             let alert = NSAlert()
-            alert.messageText = "多媒体工具箱 (快捷操作)"
+            alert.messageText = "Creator Hub (快捷操作)"
             alert.informativeText = "收到 \(urls.count) 个文件，请选择快捷处理方式："
             
             if isMovie {

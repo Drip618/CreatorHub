@@ -148,7 +148,11 @@ struct ToolboxView: View {
                         }),
                         ToolItem(icon: TranslateManager.shared.isTranslating ? "globe.americas" : "character.book.closed", title: TranslateManager.shared.isTranslating ? "..." : "多语言翻译", subtitle: "Option+3", action: {
                             TranslateManager.shared.translateClipboard { result in
-                                showMessage = result != nil ? "翻译完成" : "翻译失败"
+                                if let res = result {
+                                    FloatingWindowManager.shared.show(title: "翻译结果", text: res)
+                                } else {
+                                    showMessage = "请先复制或选中要翻译的文字"
+                                }
                             }
                         }),
                         ToolItem(icon: ultimateManager.isProcessing ? "hourglass" : "doc.text.magnifyingglass", title: ultimateManager.isProcessing ? "转换中..." : "宇宙文档转换", subtitle: "", action: { showPandocDialog() }),
