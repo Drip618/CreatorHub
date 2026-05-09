@@ -200,4 +200,20 @@ class UltimateManager: ObservableObject {
         }
         try? task.run()
     }
+
+    func stripEXIF(from imageUrls: [URL], completion: @escaping (Int) -> Void) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            var successCount = 0
+            for url in imageUrls {
+                guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+                      let type = CGImageSourceGetType(source) else { continue }
+                let outputFileName = "隐私净化_\(url.lastPathComponent)"
+                let destination = SettingsManager.shared.saveUrl.appendingPathComponent(outputFileName)
+                guard let dest = CGImageDestinationCreateWithURL(destination as CFURL, type, 1, nil) else { continue }
+                CGImageDestinationAddImageFromSource(dest, source, 0, [kCGImageDestinationMetadata as String: NSNull()] as CFDictionary)
+                if CGImageDestinationFinalize(dest) { successCount += 1 }
+            }
+            DispatchQueue.main.async { completion(successCount) }
+        }
+    }
 }

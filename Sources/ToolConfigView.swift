@@ -102,7 +102,6 @@ struct ToolConfigView: View {
                     Text("PNG").tag(UTType.png)
                     Text("JPEG").tag(UTType.jpeg)
                     Text("HEIC").tag(UTType.heic)
-                    Text("WebP").tag(UTType.webp)
                 }
                 .pickerStyle(.menu)
                 .frame(width: 120)
