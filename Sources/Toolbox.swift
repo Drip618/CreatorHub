@@ -28,7 +28,7 @@ struct ToolboxView: View {
                     ToolboxSection(title: "🎬 创作流 (Creative Pro)", tools: [
                         ToolItem(icon: "camera.viewfinder", title: "屏幕截图", subtitle: "自动保存并拷贝至剪贴板", actionId: "screenshot", action: { triggerScreenshot(mode: .normal) }),
                         ToolItem(icon: "text.viewfinder", title: "文字识别", subtitle: "一键提取屏幕文字", actionId: "ocr", action: { triggerScreenshot(mode: .ocr) }),
-                        ToolItem(icon: "character.book.closed", title: "图像翻译专家", subtitle: "截图翻译 或 选择本地图片", actionId: "translate", action: { 
+                        ToolItem(icon: "character.book.closed", title: "图片翻译", subtitle: "截图翻译 或 选择本地图片", actionId: "translate", action: { 
                             self.activeConfigType = .translation
                             self.isConfigPresented = true
                         }),

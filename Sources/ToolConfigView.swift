@@ -313,7 +313,7 @@ struct ToolConfigView: View {
         case .videoTranscode: return "视频转码参数"
         case .idPhoto: return "证件照智能换底"
         case .gridSlice: return "多视图切割"
-        case .translation: return "图像翻译专家"
+        case .translation: return "图片翻译"
         }
     }
 
