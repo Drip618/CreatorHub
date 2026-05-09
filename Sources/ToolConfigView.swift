@@ -9,7 +9,7 @@ enum ConfigType: Equatable {
     case translation
 }
 
-struct GridPreset: Identifiable, Equatable {
+struct GridPreset: Identifiable, Equatable, Hashable {
     let id: String; let label: String; let rows: Int; let cols: Int
     var icon: String {
         switch id {
