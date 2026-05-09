@@ -85,9 +85,10 @@ struct ToolConfigView: View {
                 footerView
             }
         }
-        .frame(width: 440, height: type == .translation ? 320 : 580)
-        .background(VisualEffectView(material: .hudWindow, blendingMode: .behindWindow))
+        .frame(width: 440)
+        .background(Color(NSColor.windowBackgroundColor).opacity(0.95))
         .cornerRadius(16)
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.primary.opacity(0.1), lineWidth: 1))
         .onAppear { 
             if selectedPreset == nil { selectedPreset = presets[2] } 
         }

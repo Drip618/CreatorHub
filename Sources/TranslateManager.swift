@@ -6,16 +6,6 @@ class TranslateManager: ObservableObject {
     
     @Published var isTranslating = false
     
-    /// 读取剪贴板内容并翻译，结果通过 completion 返回（不覆盖剪贴板原文）
-    func translateClipboard(completion: @escaping (String?) -> Void) {
-        let pb = NSPasteboard.general
-        guard let text = pb.string(forType: .string), !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            completion(nil)
-            return
-        }
-        translate(text: text, completion: completion)
-    }
-    
     /// 翻译指定文本，结果通过 completion 返回（不修改剪贴板）
     func translateText(_ text: String, completion: @escaping (String?) -> Void) {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -23,6 +13,24 @@ class TranslateManager: ObservableObject {
             return
         }
         translate(text: text, completion: completion)
+    }
+    
+    func pickImageAndTranslate() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image]
+        panel.begin { response in
+            if response == .OK, let url = panel.url {
+                OCRManager.shared.recognizeTextFromURL(url) { text in
+                    if let t = text {
+                        self.translateText(t) { result in
+                            FloatingWindowManager.shared.show(title: "图片翻译结果", text: result ?? "翻译失败")
+                        }
+                    } else {
+                        FloatingWindowManager.shared.show(title: "翻译失败", text: "未能识别图中的文字")
+                    }
+                }
+            }
+        }
     }
     
     func translate(text: String, completion: @escaping (String?) -> Void) {
