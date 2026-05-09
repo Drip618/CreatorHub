@@ -270,45 +270,36 @@ struct SettingsView: View {
                 
                 VStack(spacing: 0) {
                     ForEach(0..<settings.customHotkeys.count, id: \.self) { index in
-                        SettingsRow(icon: "keyboard", title: "功能快捷键 \(index + 1)", subtitle: settings.getActionName(for: settings.customHotkeys[index].actionId), color: .accentColor) {
-                            HStack(spacing: 12) {
-                                Picker("", selection: $settings.customHotkeys[index].actionId) {
-                                    Text("未设置").tag(String?.none)
-                                    Section(header: Text("创作流")) {
-                                        Text("屏幕截图").tag(Optional("screenshot"))
-                                        Text("文字识别").tag(Optional("ocr"))
-                                        Text("多语言翻译").tag(Optional("translate"))
-                                        Text("语音听写").tag(Optional("speech_to_text"))
-                                        Text("宇宙文档转换").tag(Optional("doc_convert"))
-                                        Text("全能文档合并").tag(Optional("merge_docs"))
-                                    }
-                                    Section(header: Text("剪辑增强")) {
-                                        Text("XML版本降级").tag(Optional("xml_downgrade"))
-                                        Text("库缓存清理").tag(Optional("clean_cache"))
-                                        Text("音频标准化").tag(Optional("normalize_audio"))
-                                        Text("万能图像处理").tag(Optional("image_process"))
-                                        Text("全网媒体解析").tag(Optional("media_download"))
-                                    }
-                                    Section(header: Text("生产力")) {
-                                        Text("屏幕取色").tag(Optional("pick_color"))
-                                        Text("屏幕防休眠").tag(Optional("anti_sleep"))
-                                        Text("JSON专家工具").tag(Optional("json_format"))
-                                        Text("科学计算器").tag(Optional("science_calc"))
-                                        Text("单位换算").tag(Optional("unit_calc"))
-                                        Text("汇率系统").tag(Optional("currency_calc"))
-                                    }
+                        SettingsRow(icon: "keyboard", title: "功能快捷键 \(index + 1) (⌥\(index + 1))", subtitle: settings.getActionName(for: settings.customHotkeys[index].actionId), color: .accentColor) {
+                            Picker("", selection: $settings.customHotkeys[index].actionId) {
+                                Text("未设置").tag(String?.none)
+                                Section(header: Text("创作流")) {
+                                    Text("屏幕截图").tag(Optional("screenshot"))
+                                    Text("文字识别").tag(Optional("ocr"))
+                                    Text("多语言翻译").tag(Optional("translate"))
+                                    Text("语音听写").tag(Optional("speech_to_text"))
+                                    Text("宇宙文档转换").tag(Optional("doc_convert"))
+                                    Text("全能文档合并").tag(Optional("merge_docs"))
                                 }
-                                .pickerStyle(.menu)
-                                .frame(width: 140)
-                                .onChange(of: settings.customHotkeys[index].actionId) { _ in HotkeyManager.shared.refreshCustomHotkeys() }
-                                
-                                Text("⌥\(index + 1)")
-                                    .font(.system(size: 14, weight: .bold, design: .monospaced))
-                                    .padding(.horizontal, 10).padding(.vertical, 4)
-                                    .background(Color.accentColor.opacity(0.1))
-                                    .foregroundColor(.accentColor)
-                                    .cornerRadius(6)
+                                Section(header: Text("剪辑增强")) {
+                                    Text("XML版本降级").tag(Optional("xml_downgrade"))
+                                    Text("库缓存清理").tag(Optional("clean_cache"))
+                                    Text("音频标准化").tag(Optional("normalize_audio"))
+                                    Text("万能图像处理").tag(Optional("image_process"))
+                                    Text("全网媒体解析").tag(Optional("media_download"))
+                                }
+                                Section(header: Text("生产力")) {
+                                    Text("屏幕取色").tag(Optional("pick_color"))
+                                    Text("屏幕防休眠").tag(Optional("anti_sleep"))
+                                    Text("JSON专家工具").tag(Optional("json_format"))
+                                    Text("科学计算器").tag(Optional("science_calc"))
+                                    Text("单位换算").tag(Optional("unit_calc"))
+                                    Text("汇率系统").tag(Optional("currency_calc"))
+                                }
                             }
+                            .pickerStyle(.menu)
+                            .frame(width: 150)
+                            .onChange(of: settings.customHotkeys[index].actionId) { _ in HotkeyManager.shared.refreshCustomHotkeys() }
                         }
                         if index < 2 { Divider().padding(.leading, 56) }
                     }
