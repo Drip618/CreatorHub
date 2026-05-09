@@ -79,7 +79,7 @@ class ImageProcessor: ObservableObject {
                 if case .convertFormat(let utType) = action {
                     targetType = utType
                 } else {
-                    targetType = .png // Better for AIGC slices to avoid compression loss
+                    targetType = .png // Better for high-quality slices to avoid compression loss
                 }
                 
                 let ext = targetType.preferredFilenameExtension ?? "png"
