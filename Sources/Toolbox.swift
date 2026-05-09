@@ -85,6 +85,7 @@ struct ToolboxView: View {
                 VStack(spacing: 24) {
                     ToolboxSection(title: "🖥️ 屏幕与图像", tools: [
                         ToolItem(icon: "macwindow.badge.plus", title: "屏幕截图", subtitle: "Option+1", action: { triggerScreenshot() }),
+                        ToolItem(icon: "pencil.and.outline", title: "图像编辑与裁剪", subtitle: "", action: { openPreviewEdit() }),
                         ToolItem(icon: "text.viewfinder", title: ocrManager.isRecognizing ? "..." : "文字识别", subtitle: "Option+2", action: {
                             ocrManager.recognizeTextFromScreen { result in showMessage = result != nil ? "识别完成" : "识别失败" }
                         }),
@@ -95,8 +96,7 @@ struct ToolboxView: View {
                                 ultimateManager.stripEXIF(from: panel.urls) { count in showMessage = "成功净化 \(count) 张图片！" }
                             }
                         }),
-                        ToolItem(icon: imageProcessor.isProcessing ? "photo.on.rectangle.angled" : "photo.stack", title: imageProcessor.isProcessing ? "处理中..." : "万能图像处理", subtitle: "", action: { showImageProcessorDialog() }),
-                        ToolItem(icon: "pencil.and.outline", title: "图像编辑与裁剪", subtitle: "", action: { openPreviewEdit() })
+                        ToolItem(icon: imageProcessor.isProcessing ? "photo.on.rectangle.angled" : "photo.stack", title: imageProcessor.isProcessing ? "处理中..." : "万能图像处理", subtitle: "", action: { showImageProcessorDialog() })
                     ])
                     
                     ToolboxSection(title: "🎬 多媒体引擎", tools: [
@@ -119,11 +119,11 @@ struct ToolboxView: View {
                     ])
                     
                     ToolboxSection(title: "📊 智能生产力", tools: [
-                        ToolItem(icon: "plus.forwardslash.minus", title: "万能计算与换算", subtitle: "", action: { showSmartCalc() }),
                         ToolItem(icon: "eyedropper", title: "屏幕取色", subtitle: "", action: { manager.pickColor(); showMessage = "颜色已复制" }),
                         ToolItem(icon: manager.isAwake ? "sun.max.fill" : "moon.zzz", title: manager.isAwake ? "防休眠(已开启)" : "屏幕防休眠", subtitle: "", action: { manager.toggleAwake() }),
-                        ToolItem(icon: "curlybraces", title: "JSON 格式化", subtitle: "", action: { showMessage = manager.formatJSON() ? "JSON 已格式化" : "非有效 JSON" })
-                    ])
+                        ToolItem(icon: "curlybraces", title: "JSON 格式化", subtitle: "", action: { showMessage = manager.formatJSON() ? "JSON 已格式化" : "非有效 JSON" }),
+                        ToolItem(icon: "plus.forwardslash.minus", title: "万能计算与换算", subtitle: "", action: { showSmartCalc() })
+                    ].sorted(by: { $0.title.count < $1.title.count }))
                 }
                 .padding(20)
             }
@@ -138,10 +138,12 @@ struct ToolboxView: View {
     // Dialogs
     private func showSmartCalc() {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 500),
-                              styleMask: [.titled, .closable, .fullSizeContentView], backing: .buffered, defer: false)
+                              styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
         window.center(); window.title = "万能计算与换算"
+        window.isReleasedWhenClosed = false
         window.contentView = NSHostingView(rootView: SmartCalculatorView())
         window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
     
     private func showImageProcessorDialog() {
