@@ -61,7 +61,7 @@ class HotkeyManager {
             case "speech_to_text": SpeechManager.shared.toggleRecording()
             case "pick_color": SettingsManager.shared.pickColor()
             case "anti_sleep": SettingsManager.shared.toggleAwake()
-            case "json_format": _ = SettingsManager.shared.formatJSON()
+            case "json_format": _ = SettingsManager.shared.smartJSONConvert()
             case "science_calc": (NSApp.delegate as? AppDelegate)?.showSmartCalc(tab: 0)
             case "unit_calc": (NSApp.delegate as? AppDelegate)?.showSmartCalc(tab: 1)
             case "currency_calc": (NSApp.delegate as? AppDelegate)?.showSmartCalc(tab: 2)
