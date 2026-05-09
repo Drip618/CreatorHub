@@ -18,7 +18,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSUpdateDynamicServices()
         
         setupMenu()
-        PermissionManager.shared.checkAndRequestPermissions()
+        // PermissionManager.shared.checkAndRequestPermissions()
         
         setupStatusBar()
         setupHotkeys()

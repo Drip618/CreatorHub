@@ -56,9 +56,9 @@ struct ToolboxView: View {
                     ])
                     
                     ToolboxSection(title: "🎬 创作增强 (Pro Workflow)", tools: [
-                        ToolItem(icon: "arrow.down.square.fill", title: "XML 版本降级", subtitle: "兼容旧版 FCPX/PR", action: { downgradeXMLFlow() }),
-                        ToolItem(icon: "broom.fill", title: "库缓存智能清理", subtitle: "清理渲染/代理文件", action: { cleanCacheFlow() }),
-                        ToolItem(icon: "waveform.path.ecg", title: "音频音量标准化", subtitle: "自动平衡 -14 LUFS", action: { normalizeAudioFlow() })
+                        ToolItem(icon: "doc.on.doc.fill", title: "XML 版本降级", subtitle: "兼容旧版 FCPX/PR", action: { downgradeXMLFlow() }),
+                        ToolItem(icon: "folder.badge.minus", title: "库缓存智能清理", subtitle: "清理渲染/代理文件", action: { cleanCacheFlow() }),
+                        ToolItem(icon: "waveform.circle.fill", title: "音频音量标准化", subtitle: "自动平衡 -14 LUFS", action: { normalizeAudioFlow() })
                     ])
                     
                     ToolboxSection(title: "🔄 万能转换 (Media Pro)", tools: [
