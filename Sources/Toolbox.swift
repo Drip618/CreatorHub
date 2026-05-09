@@ -21,38 +21,38 @@ struct ToolboxView: View {
             ScrollView {
                 VStack(spacing: 24) {
                     ToolboxSection(title: "🖥️ 屏幕与图像", tools: [
-                        ToolItem(icon: "macwindow.badge.plus", title: "屏幕截图", subtitle: "Option+1", action: { triggerScreenshot() }),
-                        ToolItem(icon: "text.viewfinder", title: ocrManager.isRecognizing ? "识别中..." : "文字识别", subtitle: "Option+2", action: {
+                        ToolItem(icon: "macwindow.badge.plus", title: "屏幕截图", subtitle: "Option+1 全屏捕捉", action: { triggerScreenshot() }),
+                        ToolItem(icon: "text.viewfinder", title: ocrManager.isRecognizing ? "识别中..." : "文字识别", subtitle: "Option+2 提取文本", action: {
                             ocrManager.recognizeTextFromScreen { result in showMessage = result != nil ? "识别完成" : "识别失败" }
                         }),
-                        ToolItem(icon: "lock.shield", title: "图片隐私净化", subtitle: "", action: {
+                        ToolItem(icon: "lock.shield", title: "图片隐私净化", subtitle: "清除 EXIF 隐私数据", action: {
                             let panel = NSOpenPanel(); panel.allowsMultipleSelection = true; panel.canChooseFiles = true
                             if #available(macOS 11.0, *) { panel.allowedContentTypes = [.image] }
                             if panel.runModal() == .OK, !panel.urls.isEmpty {
                                 ultimateManager.stripEXIF(from: panel.urls) { count in showMessage = "成功净化 \(count) 张图片！" }
                             }
                         }),
-                        ToolItem(icon: imageProcessor.isProcessing ? "hourglass" : "photo.stack", title: imageProcessor.isProcessing ? "正在处理..." : "万能图像处理", subtitle: "", action: { showImageProcessorDialog() }),
-                        ToolItem(icon: "pencil.and.outline", title: "图像编辑与裁剪", subtitle: "", action: { openPreviewEdit() })
+                        ToolItem(icon: imageProcessor.isProcessing ? "hourglass" : "photo.stack", title: imageProcessor.isProcessing ? "正在处理..." : "万能图像处理", subtitle: "批量转换尺寸/格式", action: { showImageProcessorDialog() }),
+                        ToolItem(icon: "pencil.and.outline", title: "图像编辑与裁剪", subtitle: "快速标记与修图", action: { openPreviewEdit() })
                     ])
                     
                     ToolboxSection(title: "🎬 多媒体引擎", tools: [
-                        ToolItem(icon: ultimateManager.isProcessing ? "hourglass" : "film.circle.fill", title: ultimateManager.isProcessing ? "处理中..." : "终极视频工坊", subtitle: "", action: { showFFmpegDialog() }),
-                        ToolItem(icon: DownloadManager.shared.isDownloading ? "arrow.down.circle.fill" : "arrow.down.circle", title: DownloadManager.shared.isDownloading ? "解析中..." : "全网媒体解析", subtitle: "", action: { showDownloadDialog() })
+                        ToolItem(icon: ultimateManager.isProcessing ? "hourglass" : "film.circle.fill", title: ultimateManager.isProcessing ? "处理中..." : "终极视频工坊", subtitle: "转码、抽帧、去水印", action: { showFFmpegDialog() }),
+                        ToolItem(icon: DownloadManager.shared.isDownloading ? "arrow.down.circle.fill" : "arrow.down.circle", title: DownloadManager.shared.isDownloading ? "解析中..." : "全网媒体解析", subtitle: "解析并下载素材", action: { showDownloadDialog() })
                     ])
                     
                     ToolboxSection(title: "📄 文档创作流", tools: [
-                        ToolItem(icon: speechManager.isRecording ? "mic.fill" : "mic", title: speechManager.isRecording ? "正在听写..." : "语音听写", subtitle: "", action: {
+                        ToolItem(icon: speechManager.isRecording ? "mic.fill" : "mic", title: speechManager.isRecording ? "正在听写..." : "语音听写", subtitle: "实时语音转文字", action: {
                             speechManager.toggleRecording(); if speechManager.isRecording { showMessage = "正在倾听..." }
                         }),
-                        ToolItem(icon: TranslateManager.shared.isTranslating ? "globe" : "character.book.closed", title: TranslateManager.shared.isTranslating ? "正在翻译..." : "多语言翻译", subtitle: "Option+3", action: {
+                        ToolItem(icon: TranslateManager.shared.isTranslating ? "globe" : "character.book.closed", title: TranslateManager.shared.isTranslating ? "正在翻译..." : "多语言翻译", subtitle: "Option+3 瞬时互译", action: {
                             TranslateManager.shared.translateClipboard { result in
                                 if let res = result { FloatingWindowManager.shared.show(title: "翻译结果", text: res) }
                                 else { showMessage = "请先复制文字" }
                             }
                         }),
-                        ToolItem(icon: ultimateManager.isProcessing ? "hourglass" : "doc.text.magnifyingglass", title: ultimateManager.isProcessing ? "转换中..." : "宇宙文档转换", subtitle: "", action: { showPandocDialog() }),
-                        ToolItem(icon: DocumentManager.shared.isProcessing ? "doc.on.doc.fill" : "doc.on.doc", title: DocumentManager.shared.isProcessing ? "合并中..." : "全能文档/表格合并", subtitle: "", action: { mergeDocuments() })
+                        ToolItem(icon: ultimateManager.isProcessing ? "hourglass" : "doc.text.magnifyingglass", title: ultimateManager.isProcessing ? "转换中..." : "宇宙文档转换", subtitle: "Word/MD 格式互转", action: { showPandocDialog() }),
+                        ToolItem(icon: DocumentManager.shared.isProcessing ? "doc.on.doc.fill" : "doc.on.doc", title: DocumentManager.shared.isProcessing ? "合并中..." : "全能文档/表格合并", subtitle: "批量合并文件数据", action: { mergeDocuments() })
                     ])
                     
                     ToolboxSection(title: "🎬 创作增强 (Pro Workflow)", tools: [
@@ -62,17 +62,17 @@ struct ToolboxView: View {
                     ])
                     
                     ToolboxSection(title: "🔄 万能转换 (Media Pro)", tools: [
-                        ToolItem(icon: "bolt.fill", title: "极速批量转换", subtitle: "Permute 级体验", action: { showFFmpegDialog() }),
-                        ToolItem(icon: "music.note.list", title: "无损音频提取", subtitle: "", action: { showFFmpegDialog() })
+                        ToolItem(icon: "bolt.fill", title: "极速批量转换", subtitle: "ProRes 级转码体验", action: { showFFmpegDialog() }),
+                        ToolItem(icon: "music.note.list", title: "无损音频提取", subtitle: "从视频提取原声", action: { showFFmpegDialog() })
                     ])
 
                     ToolboxSection(title: "📊 智能生产力", tools: [
-                        ToolItem(icon: "eyedropper", title: "屏幕取色", subtitle: "", action: { settings.pickColor(); showMessage = "颜色已复制" }),
-                        ToolItem(icon: settings.isAwake ? "sun.max.fill" : "moon.zzz", title: settings.isAwake ? "已开启" : "屏幕防休眠", subtitle: "", action: { settings.toggleAwake() }),
-                        ToolItem(icon: "ruler", title: "万能单位换算", subtitle: "", action: { showSmartCalc(tab: 1) }),
-                        ToolItem(icon: "dollarsign.circle", title: "全球实时汇率", subtitle: "", action: { showSmartCalc(tab: 2) }),
-                        ToolItem(icon: "curlybraces", title: "JSON 格式化", subtitle: "", action: { showMessage = settings.formatJSON() ? "JSON 已格式化" : "非有效 JSON" }),
-                        ToolItem(icon: "plus.forwardslash.minus", title: "万能计算与换算", subtitle: "", action: { showSmartCalc(tab: 0) })
+                        ToolItem(icon: "eyedropper", title: "屏幕取色", subtitle: "获取 UI 颜色码", action: { settings.pickColor(); showMessage = "颜色已复制" }),
+                        ToolItem(icon: settings.isAwake ? "sun.max.fill" : "moon.zzz", title: settings.isAwake ? "已开启" : "屏幕防休眠", subtitle: "阻止系统自动锁屏", action: { settings.toggleAwake() }),
+                        ToolItem(icon: "ruler", title: "万能单位换算", subtitle: "国际单位瞬时转换", action: { showSmartCalc(tab: 1) }),
+                        ToolItem(icon: "dollarsign.circle", title: "全球实时汇率", subtitle: "150+ 货币更新", action: { showSmartCalc(tab: 2) }),
+                        ToolItem(icon: "curlybraces", title: "JSON 格式化", subtitle: "美化并校验源码", action: { showMessage = settings.formatJSON() ? "JSON 已格式化" : "非有效 JSON" }),
+                        ToolItem(icon: "plus.forwardslash.minus", title: "万能计算与换算", subtitle: "科学计算引擎", action: { showSmartCalc(tab: 0) })
                     ])
                 }
                 .padding(20)
