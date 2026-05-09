@@ -47,29 +47,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func setupHotkeys() {
-        let optionKey: UInt32 = 0x0800 // Carbon optionKey modifier
+        let settings = SettingsManager.shared
         
-        // Option + 1: Screenshot (Keycode 18)
-        HotkeyManager.shared.register(keyCode: 18, modifiers: optionKey) {
+        HotkeyManager.shared.register(keyCode: settings.screenshotHotkey[0], modifiers: settings.screenshotHotkey[1], id: 1) {
             self.triggerScreenshot()
         }
         
-        // Option + 2: OCR (Keycode 19)
-        HotkeyManager.shared.register(keyCode: 19, modifiers: optionKey) {
+        HotkeyManager.shared.register(keyCode: settings.ocrHotkey[0], modifiers: settings.ocrHotkey[1], id: 2) {
             OCRManager.shared.recognizeTextFromScreen { result in
                 if let res = result {
-                    FloatingWindowManager.shared.show(title: "OCR 提取结果", text: res)
+                    FloatingWindowManager.shared.show(title: "文字识别结果", text: res)
                 }
             }
         }
         
-        // Option + 3: Translate (Keycode 20)
-        HotkeyManager.shared.register(keyCode: 20, modifiers: optionKey) {
-            self.simulateCopyAndTranslate()
+        HotkeyManager.shared.register(keyCode: settings.translateHotkey[0], modifiers: settings.translateHotkey[1], id: 3) {
+            self.translateSelectedText()
         }
     }
     
-    func simulateCopyAndTranslate() {
+    func translateSelectedText() {
         let pb = NSPasteboard.general
         let oldCount = pb.changeCount
         

@@ -4,6 +4,7 @@ import Carbon
 class HotkeyManager {
     static let shared = HotkeyManager()
     private var hotkeys: [UInt32: () -> Void] = [:]
+    private var registeredRefs: [UInt32: EventHotKeyRef] = [:]
     
     init() {
         var eventType = EventTypeSpec()
@@ -33,8 +34,12 @@ class HotkeyManager {
         }, 1, &eventType, ptr, nil)
     }
     
-    func register(keyCode: Int, modifiers: UInt32, block: @escaping () -> Void) {
-        let id = UInt32(keyCode + Int(modifiers))
+    func register(keyCode: UInt32, modifiers: UInt32, id: UInt32, block: @escaping () -> Void) {
+        // Unregister if already exists
+        if let oldRef = registeredRefs[id] {
+            UnregisterEventHotKey(oldRef)
+        }
+        
         hotkeys[id] = block
         
         var hotKeyID = EventHotKeyID()
@@ -42,6 +47,18 @@ class HotkeyManager {
         hotKeyID.id = id
         
         var hotKey: EventHotKeyRef?
-        RegisterEventHotKey(UInt32(keyCode), modifiers, hotKeyID, GetApplicationEventTarget(), 0, &hotKey)
+        let status = RegisterEventHotKey(keyCode, modifiers, hotKeyID, GetApplicationEventTarget(), 0, &hotKey)
+        
+        if status == noErr, let ref = hotKey {
+            registeredRefs[id] = ref
+        }
+    }
+    
+    func unregister(id: UInt32) {
+        if let ref = registeredRefs[id] {
+            UnregisterEventHotKey(ref)
+            registeredRefs.removeValue(forKey: id)
+            hotkeys.removeValue(forKey: id)
+        }
     }
 }

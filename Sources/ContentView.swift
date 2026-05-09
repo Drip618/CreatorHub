@@ -269,13 +269,16 @@ struct SettingsView: View {
                     .padding(.horizontal, 24)
                 
                 VStack(spacing: 0) {
-                    SettingsRow(icon: "character.bubble.fill", title: lang.t("set_language"), subtitle: lang.t("set_lang_desc"), color: .blue) {
-                        Picker("", selection: $lang.currentLanguage) {
-                            Text("中文").tag(AppLanguage.zh)
-                            Text("English").tag(AppLanguage.en)
-                        }
-                        .pickerStyle(SegmentedPickerStyle())
-                        .frame(width: 140)
+                    SettingsRow(icon: "camera.fill", title: "截图快捷键", subtitle: "设置截图的自定义按键", color: .red) {
+                        ShortcutRecorderView(keyData: $settings.screenshotHotkey)
+                    }
+                    Divider().padding(.leading, 56)
+                    SettingsRow(icon: "viewfinder", title: "OCR 快捷键", subtitle: "设置文字识别按键", color: .blue) {
+                        ShortcutRecorderView(keyData: $settings.ocrHotkey)
+                    }
+                    Divider().padding(.leading, 56)
+                    SettingsRow(icon: "character.bubble.fill", title: "翻译快捷键", subtitle: "设置剪贴板翻译按键", color: .green) {
+                        ShortcutRecorderView(keyData: $settings.translateHotkey)
                     }
                     Divider().padding(.leading, 56)
                     SettingsRow(icon: "folder.fill", title: lang.t("set_save_path"), subtitle: settings.savePath, color: .orange) {
@@ -284,8 +287,13 @@ struct SettingsView: View {
                         }.buttonStyle(PlainButtonStyle())
                     }
                     Divider().padding(.leading, 56)
-                    SettingsRow(icon: "command", title: lang.t("set_hotkeys"), subtitle: lang.t("set_hotkeys_desc"), color: .purple) {
-                        Text("⌥ + 1/2/3").font(.caption).padding(.horizontal, 8).padding(.vertical, 4).background(Color.primary.opacity(0.1)).cornerRadius(4)
+                    SettingsRow(icon: "globe", title: lang.t("set_language"), subtitle: lang.t("set_lang_desc"), color: .purple) {
+                        Picker("", selection: $lang.currentLanguage) {
+                            Text("中文").tag(AppLanguage.zh)
+                            Text("English").tag(AppLanguage.en)
+                        }
+                        .pickerStyle(SegmentedPickerStyle())
+                        .frame(width: 120)
                     }
                 }
                 .background(Color(NSColor.controlBackgroundColor).opacity(0.6))

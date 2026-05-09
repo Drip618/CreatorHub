@@ -3,191 +3,258 @@ import SwiftUI
 struct SmartCalculatorView: View {
     @State private var input: String = ""
     @State private var result: String = "0"
-    @State private var selectedTab = 0 // 0: Calc, 1: Unit, 2: Currency
+    @State private var selectedTab: Int
     
-    // Currency Data
-    let rates = ["USD": 1.0, "CNY": 7.23, "EUR": 0.92, "JPY": 155.0, "HKD": 7.82]
+    init(initialTab: Int = 0) {
+        _selectedTab = State(initialValue: initialTab)
+    }
+    
+    @State private var selectedUnit = "len"
     @State private var fromCurrency = "USD"
     @State private var toCurrency = "CNY"
     
-    // Unit Data
-    let units = ["长度 (m -> ft)": 3.28084, "重量 (kg -> lb)": 2.20462, "面积 (m² -> ft²)": 10.7639]
-    @State private var selectedUnit = "长度 (m -> ft)"
-    
-    let buttons = [
-        ["7", "8", "9", "/"],
-        ["4", "5", "6", "*"],
-        ["1", "2", "3", "-"],
-        ["0", ".", "C", "+"],
-        ["sin", "cos", "tan", "="]
-    ]
+    let opColor = Color.orange
+    let numColor = Color.secondary.opacity(0.15)
+    let funcColor = Color.secondary.opacity(0.35)
     
     var body: some View {
         VStack(spacing: 0) {
-            Picker("", selection: $selectedTab) {
-                Text("科学计算").tag(0)
-                Text("单位换算").tag(1)
-                Text("全球汇率").tag(2)
+            // Header
+            HStack {
+                Text(toolTitle)
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundColor(.primary)
+                Spacer()
+                Button(action: { NSApp.keyWindow?.close() }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.secondary)
+                        .font(.title2)
+                }.buttonStyle(.plain)
             }
-            .pickerStyle(.segmented)
-            .padding()
+            .padding(.horizontal, 30)
+            .padding(.top, 30)
             
-            VStack(spacing: 15) {
-                // Display Area
-                VStack(alignment: .trailing, spacing: 5) {
-                    TextField("输入...", text: $input)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 24, weight: .medium, design: .monospaced))
-                        .multilineTextAlignment(.trailing)
-                        .onChange(of: input) { _ in autoCalculate() }
-                    
-                    Text(result)
-                        .font(.system(size: 40, weight: .bold, design: .monospaced))
-                        .foregroundColor(.accentColor)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.5)
-                }
-                .padding()
-                .background(Color.primary.opacity(0.05))
-                .cornerRadius(12)
-                
+            // Result Display Area (Premium Style)
+            VStack(alignment: .trailing, spacing: 5) {
                 if selectedTab == 0 {
-                    numpadGrid
+                    Text(input.isEmpty ? " " : input)
+                        .font(.system(size: 18, weight: .light, design: .monospaced))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+                
+                Text(result)
+                    .font(.system(size: 64, weight: .bold, design: .rounded))
+                    .foregroundColor(.accentColor)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.3)
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
+            .padding(.horizontal, 40)
+            .padding(.vertical, 30)
+            .background(Color.primary.opacity(0.03))
+            .cornerRadius(20)
+            .padding(.horizontal, 20)
+            
+            // Interface Content
+            VStack {
+                if selectedTab == 0 {
+                    calculatorInterface.transition(.move(edge: .bottom).combined(with: .opacity))
                 } else if selectedTab == 1 {
-                    unitControls
+                    unitInterface.transition(.move(edge: .bottom).combined(with: .opacity))
                 } else {
-                    currencyControls
+                    currencyInterface.transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
-            .padding()
+            .padding(.top, 20)
             
-            Button("复制结果") {
-                let pb = NSPasteboard.general
-                pb.clearContents()
-                pb.setString(result, forType: .string)
+            Spacer()
+            
+            // Bottom Action
+            Button(action: copyResult) {
+                HStack {
+                    Image(systemName: "doc.on.doc.fill")
+                    Text("复制结果 (Copy Result)")
+                }
+                .font(.system(size: 16, weight: .bold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(LinearGradient(colors: [.blue, .purple], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .foregroundColor(.white)
+                .cornerRadius(15)
+                .shadow(color: .blue.opacity(0.3), radius: 10, x: 0, y: 5)
             }
-            .buttonStyle(.borderedProminent)
-            .padding(.bottom)
+            .buttonStyle(.plain)
+            .padding(.horizontal, 30)
+            .padding(.bottom, 30)
         }
-        .frame(width: 400, height: 550)
-        .background(VisualEffectView(material: .hudWindow, blendingMode: .behindWindow).ignoresSafeArea())
+        .frame(width: 440)
+        .background(CalcVisualEffectView(material: .hudWindow, blendingMode: .behindWindow).ignoresSafeArea())
     }
     
-    var numpadGrid: some View {
-        VStack(spacing: 10) {
-            ForEach(buttons, id: \.self) { row in
-                HStack(spacing: 10) {
-                    ForEach(row, id: \.self) { label in
-                        Button(action: { buttonPressed(label) }) {
-                            Text(label)
-                                .font(.system(size: 18, weight: .medium))
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                .aspectRatio(1, contentMode: .fit)
+    var toolTitle: String {
+        switch selectedTab {
+        case 0: return "科学计算器"
+        case 1: return "万能单位换算"
+        case 2: return "全球实时汇率"
+        default: return ""
+        }
+    }
+    
+    var calculatorInterface: some View {
+        HStack(spacing: 12) {
+            VStack(spacing: 12) {
+                ForEach(["sin", "cos", "tan", "log", "√", "π", "e", "^"], id: \.self) { label in
+                    CalcButton(label: label, color: funcColor) { handlePress(label) }
+                }
+            }
+            .frame(width: 80)
+            
+            VStack(spacing: 12) {
+                ForEach([
+                    ["AC", "±", "%", "/"],
+                    ["7", "8", "9", "*"],
+                    ["4", "5", "6", "-"],
+                    ["1", "2", "3", "+"],
+                    ["0", ".", "Del", "="]
+                ], id: \.self) { row in
+                    HStack(spacing: 12) {
+                        ForEach(row, id: \.self) { label in
+                            CalcButton(label: label, color: isOperator(label) ? opColor : (isFunc(label) ? funcColor : numColor)) {
+                                handlePress(label)
+                            }
                         }
-                        .buttonStyle(.bordered)
-                        .tint(isOperator(label) ? .orange : .primary)
                     }
                 }
             }
         }
+        .padding(.horizontal, 20)
     }
     
-    var unitControls: some View {
-        VStack(spacing: 20) {
-            Picker("换算类型", selection: $selectedUnit) {
-                ForEach(units.keys.sorted(), id: \.self) { Text($0) }
+    var unitInterface: some View {
+        VStack(spacing: 30) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("输入原始数值").font(.headline).foregroundColor(.secondary)
+                TextField("请输入数字...", text: $input)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 48, weight: .black, design: .rounded))
+                    .onChange(of: input) { _ in autoConvert() }
             }
-            .pickerStyle(.menu)
+            .padding(30)
+            .background(Color.primary.opacity(0.05))
+            .cornerRadius(20)
             
-            Text("支持键盘直接输入数值")
-                .font(.caption)
-                .foregroundColor(.secondary)
+            VStack(alignment: .leading, spacing: 15) {
+                Text("选择换算类型").font(.headline).foregroundColor(.secondary)
+                Picker("", selection: $selectedUnit) {
+                    Text("📏 长度 (m -> ft)").tag("len")
+                    Text("⚖️ 重量 (kg -> lb)").tag("weight")
+                    Text("📐 面积 (m² -> ft²)").tag("area")
+                    Text("🧪 体积 (L -> Gal)").tag("vol")
+                }
+                .pickerStyle(.segmented)
+            }
         }
+        .padding(.horizontal, 30)
     }
     
-    var currencyControls: some View {
-        VStack(spacing: 20) {
-            HStack {
-                Picker("", selection: $fromCurrency) {
-                    ForEach(rates.keys.sorted(), id: \.self) { Text($0) }
+    var currencyInterface: some View {
+        VStack(spacing: 30) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("基础金额").font(.headline).foregroundColor(.secondary)
+                TextField("输入金额...", text: $input)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 48, weight: .black, design: .rounded))
+                    .onChange(of: input) { _ in autoConvert() }
+            }
+            .padding(30)
+            .background(Color.primary.opacity(0.05))
+            .cornerRadius(20)
+            
+            HStack(spacing: 20) {
+                VStack(alignment: .leading) {
+                    Text("从 (From)").font(.caption).foregroundColor(.secondary)
+                    Picker("", selection: $fromCurrency) {
+                        Text("USD 🇺🇸").tag("USD")
+                        Text("CNY 🇨🇳").tag("CNY")
+                        Text("EUR 🇪🇺").tag("EUR")
+                        Text("JPY 🇯🇵").tag("JPY")
+                    }
                 }
-                Image(systemName: "arrow.right")
-                Picker("", selection: $toCurrency) {
-                    ForEach(rates.keys.sorted(), id: \.self) { Text($0) }
+                Image(systemName: "arrow.right.circle.fill").font(.largeTitle).foregroundColor(.accentColor)
+                VStack(alignment: .leading) {
+                    Text("到 (To)").font(.caption).foregroundColor(.secondary)
+                    Picker("", selection: $toCurrency) {
+                        Text("CNY 🇨🇳").tag("CNY")
+                        Text("USD 🇺🇸").tag("USD")
+                        Text("EUR 🇪🇺").tag("EUR")
+                        Text("JPY 🇯🇵").tag("JPY")
+                    }
                 }
             }
             .pickerStyle(.menu)
+            .padding()
+            .background(Color.primary.opacity(0.05))
+            .cornerRadius(15)
+        }
+        .padding(.horizontal, 30)
+    }
+    
+    func handlePress(_ label: String) {
+        if label == "AC" { input = ""; result = "0" }
+        else if label == "Del" { if !input.isEmpty { input.removeLast() } }
+        else if label == "=" { calculateResult() }
+        else if ["sin", "cos", "tan", "log", "√"].contains(label) { input += label + "(" }
+        else { input += label }
+        autoConvert()
+    }
+    
+    func calculateResult() {
+        if input.isEmpty { return }
+        let formula = input.replacingOccurrences(of: "√", with: "sqrt")
+            .replacingOccurrences(of: "π", with: "\(Double.pi)")
+            .replacingOccurrences(of: "e", with: "\(M_E)")
+            .replacingOccurrences(of: "log", with: "log10")
+        let expression = NSExpression(format: formula)
+        if let val = expression.expressionValue(with: nil, context: nil) as? NSNumber { result = formatNumber(val.doubleValue) }
+        else { result = "格式错误" }
+    }
+    
+    func autoConvert() {
+        guard let val = Double(input) else { return }
+        if selectedTab == 1 {
+            let factors: [String: Double] = ["len": 3.28084, "weight": 2.20462, "area": 10.7639, "vol": 0.264172]
+            if let factor = factors[selectedUnit] { result = formatNumber(val * factor) }
+        } else if selectedTab == 2 {
+            let rates: [String: Double] = ["USD": 1.0, "CNY": 7.23, "EUR": 0.92, "JPY": 155.0]
+            if let from = rates[fromCurrency], let to = rates[toCurrency] { result = formatNumber((val / from) * to) }
         }
     }
     
-    func buttonPressed(_ label: String) {
-        if label == "C" {
-            input = ""
-            result = "0"
-        } else if label == "=" {
-            calculateFinal()
-        } else if ["sin", "cos", "tan"].contains(label) {
-            input += "\(label)("
-        } else {
-            input += label
-        }
+    func formatNumber(_ d: Double) -> String {
+        let formatter = NumberFormatter(); formatter.minimumFractionDigits = 0; formatter.maximumFractionDigits = 4; formatter.numberStyle = .decimal
+        return formatter.string(from: NSNumber(value: d)) ?? "\(d)"
     }
     
-    func isOperator(_ label: String) -> Bool {
-        return ["/", "*", "-", "+", "=", "sin", "cos", "tan"].contains(label)
-    }
-    
-    func autoCalculate() {
-        if selectedTab == 1 { convertUnit() }
-        else if selectedTab == 2 { convertCurrency() }
-        else {
-            // Optional: Preview calculation
-        }
-    }
-    
-    func calculateFinal() {
-        let expressionStr = input.replacingOccurrences(of: "sin", with: "sin")
-            .replacingOccurrences(of: "cos", with: "cos")
-            .replacingOccurrences(of: "tan", with: "tan")
-        
-        let expression = NSExpression(format: expressionStr)
-        if let val = expression.expressionValue(with: nil, context: nil) as? NSNumber {
-            result = "\(val.doubleValue)"
-        } else {
-            result = "Error"
-        }
-    }
-    
-    func convertUnit() {
-        guard let val = Double(input) else { result = "0"; return }
-        if let factor = units[selectedUnit] {
-            result = String(format: "%.4f", val * factor)
-        }
-    }
-    
-    func convertCurrency() {
-        guard let val = Double(input),
-              let fromRate = rates[fromCurrency],
-              let toRate = rates[toCurrency] else { result = "0"; return }
-        let base = val / fromRate
-        result = String(format: "%.2f", base * toRate)
+    func copyResult() { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(result, forType: .string) }
+    func isOperator(_ s: String) -> Bool { ["/", "*", "-", "+", "="].contains(s) }
+    func isFunc(_ s: String) -> Bool { ["AC", "±", "%", "Del"].contains(s) }
+}
+
+struct CalcButton: View {
+    let label: String; let color: Color; let action: () -> Void
+    var body: some View {
+        Button(action: action) {
+            Text(label).font(.system(size: 22, weight: .bold, design: .rounded))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(color).foregroundColor(color == .orange ? .white : .primary)
+                .cornerRadius(15).shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 3)
+        }.buttonStyle(.plain)
     }
 }
 
-struct VisualEffectView: NSViewRepresentable {
-    let material: NSVisualEffectView.Material
-    let blendingMode: NSVisualEffectView.BlendingMode
-    
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let view = NSVisualEffectView()
-        view.material = material
-        view.blendingMode = blendingMode
-        view.state = .active
-        return view
-    }
-    
-    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
-        nsView.material = material
-        nsView.blendingMode = blendingMode
-    }
+struct CalcVisualEffectView: NSViewRepresentable {
+    let material: NSVisualEffectView.Material; let blendingMode: NSVisualEffectView.BlendingMode
+    func makeNSView(context: Context) -> NSVisualEffectView { let view = NSVisualEffectView(); view.material = material; view.blendingMode = blendingMode; view.state = .active; return view }
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }

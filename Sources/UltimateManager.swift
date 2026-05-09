@@ -186,7 +186,45 @@ class UltimateManager: ObservableObject {
         }
     }
     
-    // MARK: - Privacy EXIF Stripper (Native ImageIO)
+    // MARK: - Video Editor Special Tools
+    func cleanFCPXCache(urls: [URL], completion: @escaping (Int64) -> Void) {
+        DispatchQueue.global(qos: .default).async {
+            var freedSpace: Int64 = 0
+            let fm = FileManager.default
+            for url in urls {
+                let enumerator = fm.enumerator(at: url, includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey], options: [.skipsHiddenFiles])
+                while let fileUrl = enumerator?.nextObject() as? URL {
+                    if fileUrl.path.contains("Render Files") || fileUrl.path.contains("Analysis Files") || fileUrl.path.contains("Transcoded Media") {
+                        if let attrs = try? fm.attributesOfItem(atPath: fileUrl.path) {
+                            freedSpace += (attrs[.size] as? Int64) ?? 0
+                        }
+                        try? fm.removeItem(at: fileUrl)
+                    }
+                }
+            }
+            DispatchQueue.main.async { completion(freedSpace) }
+        }
+    }
+    
+    func normalizeLoudness(url: URL, completion: @escaping (Bool, String) -> Void) {
+        guard let ffmpegPath = Bundle.main.path(forResource: "ffmpeg", ofType: "") else {
+            completion(false, "FFmpeg 引擎缺失")
+            return
+        }
+        let outName = "标准化音频_\(Int(Date().timeIntervalSince1970)).mp3"
+        let outPath = SettingsManager.shared.saveUrl.appendingPathComponent(outName).path
+        
+        // Target -14 LUFS (YouTube/Spotify standard)
+        let task = Process()
+        task.launchPath = ffmpegPath
+        task.arguments = ["-i", url.path, "-af", "loudnorm=I=-14:LRA=11:tp=-1", "-y", outPath]
+        
+        task.terminationHandler = { proc in
+            DispatchQueue.main.async { completion(proc.terminationStatus == 0, proc.terminationStatus == 0 ? "标准化完成: \(outName)" : "处理失败") }
+        }
+        try? task.run()
+    }
+    
     func stripEXIF(from imageUrls: [URL], completion: @escaping (Int) -> Void) {
         DispatchQueue.global(qos: .userInitiated).async {
             var successCount = 0

@@ -101,4 +101,26 @@ class DocumentManager: ObservableObject {
             }
         }
     }
+    func downgradeXML(url: URL, targetVersion: String, completion: @escaping (Bool, String) -> Void) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                var content = try String(contentsOf: url, encoding: .utf8)
+                
+                // Generic XML version replacement logic (FCPX/Premiere)
+                // Pattern: version="1.10" -> version="1.9"
+                let pattern = "version=\"[^\"]+\""
+                let regex = try NSRegularExpression(pattern: pattern, options: [])
+                let range = NSRange(content.startIndex..<content.endIndex, in: content)
+                
+                content = regex.stringByReplacingMatches(in: content, options: [], range: range, withTemplate: "version=\"\(targetVersion)\"")
+                
+                let outUrl = SettingsManager.shared.saveUrl.appendingPathComponent("\(url.deletingPathExtension().lastPathComponent)_降级版.\(url.pathExtension)")
+                try content.write(to: outUrl, atomically: true, encoding: .utf8)
+                
+                DispatchQueue.main.async { completion(true, "XML 已成功降级至 \(targetVersion)") }
+            } catch {
+                DispatchQueue.main.async { completion(false, "XML 降级处理失败") }
+            }
+        }
+    }
 }
