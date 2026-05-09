@@ -4,6 +4,8 @@
 <dict>
 	<key>CFBundleExecutable</key>
 	<string>CreatorHub</string>
+	<key>NSHumanReadableCopyright</key>
+	<string>Copyright © 2024 刘迪. All rights reserved.</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.drip.CreatorHub</string>
 	<key>CFBundleName</key>
