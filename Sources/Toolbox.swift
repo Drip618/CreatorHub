@@ -115,7 +115,7 @@ struct ToolboxView: View {
                             }
                         }),
                         ToolItem(icon: ultimateManager.isProcessing ? "hourglass" : "doc.text.magnifyingglass", title: ultimateManager.isProcessing ? "转换中..." : "宇宙文档转换", subtitle: "", action: { showPandocDialog() }),
-                        ToolItem(icon: DocumentManager.shared.isProcessing ? "doc.on.doc.fill" : "doc.on.doc", title: DocumentManager.shared.isProcessing ? "..." : "智能 PDF 拼接", subtitle: "", action: { mergePDFs() })
+                        ToolItem(icon: DocumentManager.shared.isProcessing ? "doc.on.doc.fill" : "doc.on.doc", title: DocumentManager.shared.isProcessing ? "..." : "全能文档/表格合并", subtitle: "", action: { mergeDocuments() })
                     ])
                     
                     ToolboxSection(title: "📊 智能生产力", tools: [
@@ -275,11 +275,15 @@ struct ToolboxView: View {
         }
     }
     
-    private func mergePDFs() {
-        let panel = NSOpenPanel(); panel.allowsMultipleSelection = true; if #available(macOS 11.0, *) { panel.allowedContentTypes = [.pdf] }
+    private func mergeDocuments() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = true
+        if #available(macOS 11.0, *) {
+            panel.allowedContentTypes = [.pdf, .text, .plainText, .rtf, UTType("com.microsoft.word.doc")!, UTType("org.openxmlformats.wordprocessingml.document")!, .commaSeparatedText]
+        }
         if panel.runModal() == .OK, panel.urls.count > 1 {
-            DocumentManager.shared.mergePDFs(urls: panel.urls, saveTo: SettingsManager.shared.saveUrl) { success in
-                showMessage = success ? "PDF 合并成功！" : "合并失败"
+            DocumentManager.shared.mergeFiles(urls: panel.urls) { success, msg in
+                showMessage = msg
             }
         }
     }

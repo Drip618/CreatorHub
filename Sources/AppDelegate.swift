@@ -230,11 +230,11 @@ class ServiceProvider: NSObject {
                 } else if resp == .alertThirdButtonReturn {
                     UltimateManager.shared.processVideo(url: urls[0], action: .transcodeToMP4) { _,_ in }
                 }
-            } else if isPDF && urls.count > 1 {
-                alert.addButton(withTitle: "自动合并为单文件")
+            } else if urls.count > 1 {
+                alert.addButton(withTitle: "智能合并所选文档/表格")
                 alert.addButton(withTitle: "取消")
                 if alert.runModal() == .alertFirstButtonReturn {
-                    DocumentManager.shared.mergePDFs(urls: urls, saveTo: SettingsManager.shared.saveUrl) { _ in }
+                    DocumentManager.shared.mergeFiles(urls: urls) { _, _ in }
                 }
             } else if isImage {
                 alert.addButton(withTitle: "净化隐私定位 (EXIF)")
