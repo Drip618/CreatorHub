@@ -76,6 +76,7 @@ class OCRManager: ObservableObject {
             }
         }
     }
+    
     func recognizeTextFromURL(_ url: URL, completion: @escaping (String?) -> Void) {
         guard !isRecognizing else { return }
         
@@ -129,3 +130,4 @@ class OCRManager: ObservableObject {
             }
         }
     }
+}

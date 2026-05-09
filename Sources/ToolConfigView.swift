@@ -103,7 +103,7 @@ struct ToolConfigView: View {
                     Spacer()
                     Text("\(urls.count) 个文件").foregroundColor(.white.opacity(0.7))
                 }
-                .fontWeight(.semibold)
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 13)
