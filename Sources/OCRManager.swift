@@ -14,25 +14,33 @@ class OCRManager: ObservableObject {
             self.isRecognizing = true
         }
         
-        // Trigger interactive screen capture to clipboard
-        let task = Process()
-        task.launchPath = "/usr/sbin/screencapture"
-        task.arguments = ["-i", "-c"]
-        task.launch()
-        task.waitUntilExit()
-        
-        // Read the image from clipboard
-        guard let imgData = NSPasteboard.general.data(forType: .tiff),
-              let image = NSImage(data: imgData),
-              let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-            DispatchQueue.main.async {
-                self.isRecognizing = false
-                completion(nil)
+        DispatchQueue.global(qos: .userInitiated).async {
+            // Trigger interactive screen capture to clipboard
+            let task = Process()
+            task.launchPath = "/usr/sbin/screencapture"
+            task.arguments = ["-i", "-c"]
+            do {
+                try task.run()
+                task.waitUntilExit()
+            } catch {
+                DispatchQueue.main.async {
+                    self.isRecognizing = false
+                    completion(nil)
+                }
+                return
             }
-            return
-        }
-        
-        let request = VNRecognizeTextRequest { request, error in
+            
+            DispatchQueue.main.async {
+                // Read the image from clipboard
+                guard let imgData = NSPasteboard.general.data(forType: .tiff),
+                      let image = NSImage(data: imgData),
+                      let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+                    self.isRecognizing = false
+                    completion(nil)
+                    return
+                }
+                
+                let request = VNRecognizeTextRequest { request, error in
             guard error == nil else {
                 DispatchQueue.main.async {
                     self.isRecognizing = false

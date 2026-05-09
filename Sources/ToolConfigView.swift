@@ -231,11 +231,15 @@ struct ToolConfigView: View {
         HStack(spacing: 20) {
             TranslationModeButton(title: "屏幕截图翻译", subtitle: "选取屏幕区域翻译", icon: "camera.viewfinder") {
                 isPresented = false
-                onConfirm("screen")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    onConfirm("screen")
+                }
             }
             TranslationModeButton(title: "本地图片翻译", subtitle: "选择本地文件翻译", icon: "photo.on.rectangle") {
                 isPresented = false
-                onConfirm("file")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    onConfirm("file")
+                }
             }
         }
     }
@@ -252,15 +256,17 @@ struct ToolConfigView: View {
 
     private func handleConfirm() {
         isPresented = false
-        switch type {
-        case .imageProcess: onConfirm((imageScale, imageFormat))
-        case .videoTranscode: onConfirm((videoRes, videoFormat, videoQuality))
-        case .idPhoto: onConfirm(bgColor)
-        case .gridSlice:
-            if let p = selectedPreset {
-                onConfirm(p.id == "custom" ? (customRows, customCols) : (p.rows, p.cols))
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            switch type {
+            case .imageProcess: onConfirm((imageScale, imageFormat))
+            case .videoTranscode: onConfirm((videoRes, videoFormat, videoQuality))
+            case .idPhoto: onConfirm(bgColor)
+            case .gridSlice:
+                if let p = selectedPreset {
+                    onConfirm(p.id == "custom" ? (customRows, customCols) : (p.rows, p.cols))
+                }
+            case .translation: break
             }
-        case .translation: break
         }
     }
 }
