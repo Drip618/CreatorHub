@@ -67,13 +67,6 @@ struct ToolboxView: View {
                     ToolboxSection(title: "📊 智能生产力", tools: [
                         ToolItem(icon: "eyedropper", title: "屏幕取色", subtitle: "获取 UI 颜色码", actionId: "pick_color", action: { settings.pickColor(); showMessage = "颜色已复制" }),
                         ToolItem(icon: settings.isAwake ? "sun.max.fill" : "moon.zzz", title: settings.isAwake ? "已开启" : "屏幕防休眠", subtitle: "阻止系统自动锁屏", actionId: "anti_sleep", action: { settings.toggleAwake() }),
-                        ToolItem(icon: "sparkles", title: "AI 提示词专家", subtitle: "口语转专业级提示词", actionId: "ai_prompt", action: { 
-                            if let result = AIPromptManager.shared.transformClipboard() {
-                                showMessage = result
-                            } else {
-                                showMessage = "请先复制一段话"
-                            }
-                        }),
                         ToolItem(icon: "ruler", title: "万能单位换算", subtitle: "国际单位瞬时转换", actionId: "unit_calc", action: { (NSApp.delegate as? AppDelegate)?.showSmartCalc(tab: 1) }),
                         ToolItem(icon: "dollarsign.circle", title: "全球实时汇率", subtitle: "主流货币实时换算", actionId: "currency_calc", action: { (NSApp.delegate as? AppDelegate)?.showSmartCalc(tab: 2) }),
                         ToolItem(icon: "curlybraces", title: "JSON 专家工具", subtitle: "文本转 JSON / 美化", actionId: "json_format", action: { showMessage = settings.smartJSONConvert() }),

@@ -3,11 +3,9 @@ import AppKit
 
 struct CustomHotkey: Codable, Identifiable {
     var id: Int
-    var actionId: String? // e.g. "screenshot", "ocr", etc.
-    var keyCode: UInt32?
-    var modifiers: UInt32?
-    
-    var isConfigured: Bool { keyCode != nil && actionId != nil }
+    var actionId: String?
+    var keyCode: UInt32
+    var modifiers: UInt32
 }
 
 class SettingsManager: ObservableObject {
@@ -16,7 +14,7 @@ class SettingsManager: ObservableObject {
     @Published var savePath: String { didSet { UserDefaults.standard.set(savePath, forKey: "savePath") } }
     @Published var isAwake: Bool = false
     
-    // Five custom dynamic hotkeys
+    // 3 Fixed Slots: Option+1, Option+2, Option+3
     @Published var customHotkeys: [CustomHotkey] {
         didSet {
             if let data = try? JSONEncoder().encode(customHotkeys) {
@@ -38,15 +36,16 @@ class SettingsManager: ObservableObject {
         self.savePath = UserDefaults.standard.string(forKey: "savePath") ?? defaultPath
         
         if let data = UserDefaults.standard.data(forKey: "customHotkeys"),
-           let decoded = try? JSONDecoder().decode([CustomHotkey].self, from: data) {
+           let decoded = try? JSONDecoder().decode([CustomHotkey].self, from: data),
+           decoded.count == 3 {
             self.customHotkeys = decoded
         } else {
-            // Default 5 empty slots
-            self.customHotkeys = (1...5).map { CustomHotkey(id: $0) }
-            // Populate first 3 with defaults for backward compatibility/quick start
-            self.customHotkeys[0].actionId = "screenshot"; self.customHotkeys[0].keyCode = 18; self.customHotkeys[0].modifiers = 0x0800 // Opt+1
-            self.customHotkeys[1].actionId = "ocr"; self.customHotkeys[1].keyCode = 19; self.customHotkeys[1].modifiers = 0x0800        // Opt+2
-            self.customHotkeys[2].actionId = "translate"; self.customHotkeys[2].keyCode = 20; self.customHotkeys[2].modifiers = 0x0800  // Opt+3
+            // Default 3 slots with fixed keys
+            self.customHotkeys = [
+                CustomHotkey(id: 1, actionId: "screenshot", keyCode: 18, modifiers: 0x0800), // Opt+1
+                CustomHotkey(id: 2, actionId: "ocr", keyCode: 19, modifiers: 0x0800),        // Opt+2
+                CustomHotkey(id: 3, actionId: "translate", keyCode: 20, modifiers: 0x0800)  // Opt+3
+            ]
         }
     }
     
@@ -56,7 +55,6 @@ class SettingsManager: ObservableObject {
         if panel.runModal() == .OK, let url = panel.url { self.savePath = url.path }
     }
     
-    // Action Labels Mapping
     func getActionName(for actionId: String?) -> String {
         switch actionId {
         case "screenshot": return "屏幕截图"
@@ -75,92 +73,46 @@ class SettingsManager: ObservableObject {
         case "science_calc": return "科学计算器"
         case "unit_calc": return "单位换算"
         case "currency_calc": return "汇率系统"
-        case "json_format": return "JSON格式化"
+        case "json_format": return "JSON专家工具"
         default: return "未选择功能"
         }
     }
     
-    // Hotkey Display String
     func getHotkeyString(for actionId: String) -> String? {
-        if let hk = customHotkeys.first(where: { $0.actionId == actionId && $0.keyCode != nil }) {
-            return stringFor(keyCode: hk.keyCode!, modifiers: hk.modifiers ?? 0)
+        if let hk = customHotkeys.first(where: { $0.actionId == actionId }) {
+            return "⌥\(hk.id)"
         }
         return nil
     }
     
-    private func stringFor(keyCode: UInt32, modifiers: UInt32) -> String {
-        var str = ""
-        if modifiers & 0x0100 != 0 { str += "⌘" }
-        if modifiers & 0x0200 != 0 { str += "⇧" }
-        if modifiers & 0x0400 != 0 { str += "⌃" }
-        if modifiers & 0x0800 != 0 { str += "⌥" }
-        
-        let charMap: [UInt32: String] = [
-            18: "1", 19: "2", 20: "3", 21: "4", 23: "5", 22: "6", 26: "7", 28: "8", 25: "9", 29: "0",
-            0: "A", 11: "B", 8: "C", 2: "D", 14: "E", 3: "F", 5: "G", 4: "H", 34: "I", 38: "J", 40: "K", 37: "L", 46: "M",
-            45: "N", 31: "O", 35: "P", 12: "Q", 15: "R", 1: "S", 17: "T", 32: "U", 9: "V", 13: "W", 7: "X", 16: "Y", 6: "Z",
-            49: "Space", 36: "Return", 48: "Tab", 53: "Esc", 51: "Del", 126: "↑", 125: "↓", 123: "←", 124: "→"
-        ]
-        str += charMap[keyCode] ?? "Key(\(keyCode))"
-        return str
-    }
-    
-    // Toolbox Helpers
     func toggleAwake() { isAwake.toggle() }
     
     func pickColor() {
         NSColorSampler().show { color in
             if let color = color {
                 let hex = String(format: "#%02X%02X%02X", Int(color.redComponent * 255), Int(color.greenComponent * 255), Int(color.blueComponent * 255))
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(hex, forType: .string)
+                NSPasteboard.general.clearContents(); NSPasteboard.general.setString(hex, forType: .string)
             }
         }
     }
     
     func smartJSONConvert() -> String? {
-        let pb = NSPasteboard.general
-        guard let text = pb.string(forType: .string) else { return nil }
-        
-        // 1. Try Prettify (if already JSON)
-        if let data = text.data(using: .utf8),
-           let json = try? JSONSerialization.jsonObject(with: data),
-           let prettyData = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted]),
-           let prettyString = String(data: prettyData, encoding: .utf8) {
-            pb.clearContents(); pb.setString(prettyString, forType: .string)
-            return "JSON 已美化"
+        let pb = NSPasteboard.general; guard let text = pb.string(forType: .string) else { return nil }
+        if let data = text.data(using: .utf8), let json = try? JSONSerialization.jsonObject(with: data),
+           let prettyData = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted]), let prettyString = String(data: prettyData, encoding: .utf8) {
+            pb.clearContents(); pb.setString(prettyString, forType: .string); return "JSON 已美化"
         }
-        
-        // 2. Try Key-Value conversion (e.g. "name: liudi")
         let lines = text.components(separatedBy: .newlines).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
-        var dict: [String: String] = [:]
-        var isKV = false
+        var dict: [String: String] = [:]; var isKV = false
         for line in lines {
             let parts = line.split(separator: ":", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
-            if parts.count == 2 {
-                dict[parts[0]] = parts[1]
-                isKV = true
-            } else if parts.count == 1 && line.contains("=") {
-                let partsEq = line.split(separator: "=", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
-                if partsEq.count == 2 {
-                    dict[partsEq[0]] = partsEq[1]
-                    isKV = true
-                }
-            }
+            if parts.count == 2 { dict[parts[0]] = parts[1]; isKV = true }
         }
-        
-        if isKV, let data = try? JSONSerialization.data(withJSONObject: dict, options: [.prettyPrinted]),
-           let kvString = String(data: data, encoding: .utf8) {
-            pb.clearContents(); pb.setString(kvString, forType: .string)
-            return "文本已转为 JSON 对象"
+        if isKV, let data = try? JSONSerialization.data(withJSONObject: dict, options: [.prettyPrinted]), let kvString = String(data: data, encoding: .utf8) {
+            pb.clearContents(); pb.setString(kvString, forType: .string); return "已转为 JSON 对象"
         }
-        
-        // 3. Fallback: Wrap as content string
-        let wrapped = ["content": text]
-        if let data = try? JSONSerialization.data(withJSONObject: wrapped, options: [.prettyPrinted]),
-           let wrappedString = String(data: data, encoding: .utf8) {
-            pb.clearContents(); pb.setString(wrappedString, forType: .string)
-            return "已包裹为 JSON 字符串"
+        let wrapped = ["content": text]; if let data = try? JSONSerialization.data(withJSONObject: wrapped, options: [.prettyPrinted]), let wrappedString = String(data: data, encoding: .utf8) {
+            pb.clearContents(); pb.setString(wrappedString, forType: .string); return "已包裹为 JSON 字符串"
         }
         return nil
     }

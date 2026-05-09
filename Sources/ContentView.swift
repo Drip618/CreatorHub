@@ -270,8 +270,8 @@ struct SettingsView: View {
                 
                 VStack(spacing: 0) {
                     ForEach(0..<settings.customHotkeys.count, id: \.self) { index in
-                        SettingsRow(icon: "keyboard", title: "自定义快捷键 \(index + 1)", subtitle: settings.getActionName(for: settings.customHotkeys[index].actionId), color: .accentColor) {
-                            HStack {
+                        SettingsRow(icon: "keyboard", title: "功能快捷键 \(index + 1)", subtitle: settings.getActionName(for: settings.customHotkeys[index].actionId), color: .accentColor) {
+                            HStack(spacing: 12) {
                                 Picker("", selection: $settings.customHotkeys[index].actionId) {
                                     Text("未设置").tag(String?.none)
                                     Section(header: Text("创作流")) {
@@ -292,19 +292,25 @@ struct SettingsView: View {
                                     Section(header: Text("生产力")) {
                                         Text("屏幕取色").tag(Optional("pick_color"))
                                         Text("屏幕防休眠").tag(Optional("anti_sleep"))
-                                        Text("JSON格式化").tag(Optional("json_format"))
+                                        Text("JSON专家工具").tag(Optional("json_format"))
                                         Text("科学计算器").tag(Optional("science_calc"))
                                         Text("单位换算").tag(Optional("unit_calc"))
                                         Text("汇率系统").tag(Optional("currency_calc"))
                                     }
                                 }
                                 .pickerStyle(.menu)
-                                .frame(width: 120)
+                                .frame(width: 140)
+                                .onChange(of: settings.customHotkeys[index].actionId) { _ in HotkeyManager.shared.refreshCustomHotkeys() }
                                 
-                                ShortcutRecorderView(hotkey: $settings.customHotkeys[index])
+                                Text("⌥\(index + 1)")
+                                    .font(.system(size: 14, weight: .bold, design: .monospaced))
+                                    .padding(.horizontal, 10).padding(.vertical, 4)
+                                    .background(Color.accentColor.opacity(0.1))
+                                    .foregroundColor(.accentColor)
+                                    .cornerRadius(6)
                             }
                         }
-                        if index < 4 { Divider().padding(.leading, 56) }
+                        if index < 2 { Divider().padding(.leading, 56) }
                     }
                 }
                 .background(Color(NSColor.controlBackgroundColor).opacity(0.6))
