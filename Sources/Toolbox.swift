@@ -67,9 +67,16 @@ struct ToolboxView: View {
                     ToolboxSection(title: "📊 智能生产力", tools: [
                         ToolItem(icon: "eyedropper", title: "屏幕取色", subtitle: "获取 UI 颜色码", actionId: "pick_color", action: { settings.pickColor(); showMessage = "颜色已复制" }),
                         ToolItem(icon: settings.isAwake ? "sun.max.fill" : "moon.zzz", title: settings.isAwake ? "已开启" : "屏幕防休眠", subtitle: "阻止系统自动锁屏", actionId: "anti_sleep", action: { settings.toggleAwake() }),
+                        ToolItem(icon: "sparkles", title: "AI 提示词专家", subtitle: "口语转专业级提示词", actionId: "ai_prompt", action: { 
+                            if let result = AIPromptManager.shared.transformClipboard() {
+                                showMessage = result
+                            } else {
+                                showMessage = "请先复制一段话"
+                            }
+                        }),
                         ToolItem(icon: "ruler", title: "万能单位换算", subtitle: "国际单位瞬时转换", actionId: "unit_calc", action: { (NSApp.delegate as? AppDelegate)?.showSmartCalc(tab: 1) }),
-                        ToolItem(icon: "dollarsign.circle", title: "全球实时汇率", subtitle: "150+ 货币更新", actionId: "currency_calc", action: { (NSApp.delegate as? AppDelegate)?.showSmartCalc(tab: 2) }),
-                        ToolItem(icon: "curlybraces", title: "JSON 格式化", subtitle: "美化并校验源码", actionId: "json_format", action: { showMessage = settings.formatJSON() ? "JSON 已格式化" : "非有效 JSON" }),
+                        ToolItem(icon: "dollarsign.circle", title: "全球实时汇率", subtitle: "主流货币实时换算", actionId: "currency_calc", action: { (NSApp.delegate as? AppDelegate)?.showSmartCalc(tab: 2) }),
+                        ToolItem(icon: "curlybraces", title: "JSON 专家工具", subtitle: "文本转 JSON / 美化", actionId: "json_format", action: { showMessage = settings.smartJSONConvert() }),
                         ToolItem(icon: "plus.forwardslash.minus", title: "万能计算与换算", subtitle: "科学计算引擎", actionId: "science_calc", action: { (NSApp.delegate as? AppDelegate)?.showSmartCalc(tab: 0) })
                     ])
                 }
@@ -83,60 +90,17 @@ struct ToolboxView: View {
         }
     }
     
-    // Actions
+    // Actions (rest omitted for brevity, but I'll include the necessary parts)
     private func triggerScreenshot() { (NSApp.delegate as? AppDelegate)?.triggerScreenshot() }
-    private func openPreviewEdit() { 
-        let panel = NSOpenPanel(); if panel.runModal() == .OK, let url = panel.url { NSWorkspace.shared.open(url) }
-    }
-    private func showFFmpegDialog() { 
-        let panel = NSOpenPanel(); if panel.runModal() == .OK, let url = panel.url { 
-            ultimateManager.processVideo(url: url, action: .compress) { s, m in showMessage = m }
-        }
-    }
+    private func openPreviewEdit() { let panel = NSOpenPanel(); if panel.runModal() == .OK, let url = panel.url { NSWorkspace.shared.open(url) } }
+    private func showFFmpegDialog() { let panel = NSOpenPanel(); if panel.runModal() == .OK, let url = panel.url { ultimateManager.processVideo(url: url, action: .compress) { s, m in showMessage = m } } }
     private func showDownloadDialog() { showMessage = "请在剪贴板粘贴视频链接" }
-    private func showPandocDialog() { 
-        let panel = NSOpenPanel(); if panel.runModal() == .OK, let url = panel.url { 
-            ultimateManager.processDocument(url: url, action: .mdToWord) { s, m in showMessage = m }
-        }
-    }
-    private func showImageProcessorDialog() { 
-        let panel = NSOpenPanel(); panel.allowsMultipleSelection = true; if panel.runModal() == .OK { 
-            imageProcessor.processImages(urls: panel.urls, action: .resize(scale: 0.5), saveTo: settings.saveUrl) { _ in showMessage = "图片处理完成" }
-        }
-    }
-    
-    private func cleanCacheFlow() {
-        let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false; panel.title = "选择 FCPX 库或工程文件夹"
-        if panel.runModal() == .OK {
-            ultimateManager.cleanFCPXCache(urls: panel.urls) { bytes in showMessage = "已清理 \(bytes / 1024 / 1024)MB 缓存文件" }
-        }
-    }
-    
-    private func normalizeAudioFlow() {
-        let panel = NSOpenPanel(); panel.allowedContentTypes = [.audio, .movie].compactMap { $0 }
-        if panel.runModal() == .OK, let url = panel.url {
-            ultimateManager.normalizeLoudness(url: url) { s, m in showMessage = m }
-        }
-    }
-    
-    private func mergeDocuments() {
-        let panel = NSOpenPanel(); panel.allowsMultipleSelection = true; panel.canChooseFiles = true
-        if panel.runModal() == .OK {
-            DocumentManager.shared.mergeFiles(urls: panel.urls) { success, msg in showMessage = msg }
-        }
-    }
-    
-    private func downgradeXMLFlow() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.xml, .init(filenameExtension: "fcpxml")!].compactMap { $0 }
-        if panel.runModal() == .OK, let url = panel.url {
-            ultimateManager.isProcessing = true
-            DocumentManager.shared.downgradeXML(url: url, targetVersion: "1.9") { success, msg in 
-                ultimateManager.isProcessing = false
-                showMessage = msg 
-            }
-        }
-    }
+    private func showPandocDialog() { let panel = NSOpenPanel(); if panel.runModal() == .OK, let url = panel.url { ultimateManager.processDocument(url: url, action: .mdToWord) { s, m in showMessage = m } } }
+    private func showImageProcessorDialog() { let panel = NSOpenPanel(); panel.allowsMultipleSelection = true; if panel.runModal() == .OK { imageProcessor.processImages(urls: panel.urls, action: .resize(scale: 0.5), saveTo: settings.saveUrl) { _ in showMessage = "图片处理完成" } } }
+    private func cleanCacheFlow() { let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false; if panel.runModal() == .OK { ultimateManager.cleanFCPXCache(urls: panel.urls) { bytes in showMessage = "已清理 \(bytes / 1024 / 1024)MB 缓存文件" } } }
+    private func normalizeAudioFlow() { let panel = NSOpenPanel(); panel.allowedContentTypes = [.audio, .movie].compactMap { $0 }; if panel.runModal() == .OK, let url = panel.url { ultimateManager.normalizeLoudness(url: url) { s, m in showMessage = m } } }
+    private func mergeDocuments() { let panel = NSOpenPanel(); panel.allowsMultipleSelection = true; panel.canChooseFiles = true; if panel.runModal() == .OK { DocumentManager.shared.mergeFiles(urls: panel.urls) { success, msg in showMessage = msg } } }
+    private func downgradeXMLFlow() { let panel = NSOpenPanel(); panel.allowedContentTypes = [.xml, .init(filenameExtension: "fcpxml")!].compactMap { $0 }; if panel.runModal() == .OK, let url = panel.url { ultimateManager.isProcessing = true; DocumentManager.shared.downgradeXML(url: url, targetVersion: "1.9") { success, msg in ultimateManager.isProcessing = false; showMessage = msg } } }
 }
 
 struct ToolboxSection: View {
@@ -158,10 +122,7 @@ struct ToolboxSection: View {
 }
 
 struct ToolRow: View {
-    let item: ToolItem
-    @ObservedObject var settings = SettingsManager.shared
-    @State private var isHovered = false
-    
+    let item: ToolItem; @ObservedObject var settings = SettingsManager.shared; @State private var isHovered = false
     var body: some View {
         Button(action: item.action) {
             HStack(spacing: 12) {
@@ -171,24 +132,14 @@ struct ToolRow: View {
                     if !item.subtitle.isEmpty { Text(item.subtitle).font(.system(size: 10)).foregroundColor(.secondary) }
                 }
                 Spacer()
-                
-                // Red box area display: show shortcut if assigned
                 if let hkString = settings.getHotkeyString(for: item.actionId) {
-                    Text(hkString)
-                        .font(.system(size: 10, weight: .bold, design: .monospaced))
-                        .padding(.horizontal, 6).padding(.vertical, 2)
-                        .background(Color.accentColor.opacity(0.1))
-                        .foregroundColor(.accentColor)
-                        .cornerRadius(4)
-                        .padding(.trailing, 4)
+                    Text(hkString).font(.system(size: 10, weight: .bold, design: .monospaced)).padding(.horizontal, 6).padding(.vertical, 2).background(Color.accentColor.opacity(0.1)).foregroundColor(.accentColor).cornerRadius(4).padding(.trailing, 4)
                 }
-                
                 Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold)).foregroundColor(.secondary.opacity(0.5))
             }
             .padding(.horizontal, 16).padding(.vertical, 12)
             .background(isHovered ? Color.primary.opacity(0.05) : Color.clear)
         }
-        .buttonStyle(.plain)
-        .onHover { isHovered = $0 }
+        .buttonStyle(.plain).onHover { isHovered = $0 }
     }
 }

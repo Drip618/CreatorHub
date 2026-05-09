@@ -118,18 +118,50 @@ class SettingsManager: ObservableObject {
         }
     }
     
-    func formatJSON() -> Bool {
+    func smartJSONConvert() -> String? {
         let pb = NSPasteboard.general
-        guard let text = pb.string(forType: .string) else { return false }
-        guard let data = text.data(using: .utf8) else { return false }
-        do {
-            let json = try JSONSerialization.jsonObject(with: data, options: [])
-            let prettyData = try JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted])
-            if let prettyString = String(data: prettyData, encoding: .utf8) {
-                pb.clearContents(); pb.setString(prettyString, forType: .string)
-                return true
+        guard let text = pb.string(forType: .string) else { return nil }
+        
+        // 1. Try Prettify (if already JSON)
+        if let data = text.data(using: .utf8),
+           let json = try? JSONSerialization.jsonObject(with: data),
+           let prettyData = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted]),
+           let prettyString = String(data: prettyData, encoding: .utf8) {
+            pb.clearContents(); pb.setString(prettyString, forType: .string)
+            return "JSON 已美化"
+        }
+        
+        // 2. Try Key-Value conversion (e.g. "name: liudi")
+        let lines = text.components(separatedBy: .newlines).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        var dict: [String: String] = [:]
+        var isKV = false
+        for line in lines {
+            let parts = line.split(separator: ":", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
+            if parts.count == 2 {
+                dict[parts[0]] = parts[1]
+                isKV = true
+            } else if parts.count == 1 && line.contains("=") {
+                let partsEq = line.split(separator: "=", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
+                if partsEq.count == 2 {
+                    dict[partsEq[0]] = partsEq[1]
+                    isKV = true
+                }
             }
-        } catch { return false }
-        return false
+        }
+        
+        if isKV, let data = try? JSONSerialization.data(withJSONObject: dict, options: [.prettyPrinted]),
+           let kvString = String(data: data, encoding: .utf8) {
+            pb.clearContents(); pb.setString(kvString, forType: .string)
+            return "文本已转为 JSON 对象"
+        }
+        
+        // 3. Fallback: Wrap as content string
+        let wrapped = ["content": text]
+        if let data = try? JSONSerialization.data(withJSONObject: wrapped, options: [.prettyPrinted]),
+           let wrappedString = String(data: data, encoding: .utf8) {
+            pb.clearContents(); pb.setString(wrappedString, forType: .string)
+            return "已包裹为 JSON 字符串"
+        }
+        return nil
     }
 }
