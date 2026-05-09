@@ -1,118 +1,129 @@
 import SwiftUI
 import AppKit
 
-class FloatingContent: ObservableObject {
-    @Published var title: String = ""
-    @Published var text: String = ""
-    @Published var isShowing: Bool = false
-}
-
+// MARK: - FloatingWindowManager
+// 每次 show() 都重建 contentViewController，确保 SwiftUI 视图持有最新内容
 class FloatingWindowManager {
     static let shared = FloatingWindowManager()
-    var window: NSPanel?
-    let content = FloatingContent()
-    
+    private var panel: NSPanel?
+
     func show(title: String, text: String) {
         DispatchQueue.main.async {
-            self.content.title = title
-            self.content.text = text
-            self.content.isShowing = true
-            
-            if self.window == nil {
-                let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 340, height: 220),
-                                    styleMask: [.borderless, .nonactivatingPanel, .fullSizeContentView],
-                                    backing: .buffered, defer: false)
-                panel.level = .floating
-                panel.backgroundColor = .clear
-                panel.isMovableByWindowBackground = true
-                panel.hasShadow = true
-                panel.contentViewController = NSHostingController(rootView: FloatingResultView(content: self.content) {
-                    self.hide()
-                })
-                self.window = panel
+            // Always close the old panel first
+            self.panel?.close()
+            self.panel = nil
+
+            guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+
+            let newPanel = NSPanel(
+                contentRect: NSRect(x: 0, y: 0, width: 340, height: 10), // height auto-sized
+                styleMask: [.borderless, .nonactivatingPanel, .fullSizeContentView],
+                backing: .buffered,
+                defer: false
+            )
+            newPanel.level = .floating
+            newPanel.backgroundColor = .clear
+            newPanel.isMovableByWindowBackground = true
+            newPanel.hasShadow = true
+            newPanel.isReleasedWhenClosed = false
+
+            // Build the SwiftUI view with concrete text values (no binding needed)
+            let rootView = FloatingResultView(title: title, text: text) {
+                self.panel?.close()
+                self.panel = nil
             }
-            
+            let hosting = NSHostingController(rootView: rootView)
+            hosting.view.setFrameSize(hosting.sizeThatFits(in: NSSize(width: 340, height: 800)))
+            newPanel.contentViewController = hosting
+
+            // Position: above mouse cursor, clamped to screen bounds
             let mouseLoc = NSEvent.mouseLocation
-            let screen = NSScreen.main?.frame ?? .zero
-            
-            // Calculate position: Center horizontally to mouse, and show ABOVE the mouse
-            let windowWidth: CGFloat = 340
-            let windowHeight: CGFloat = 220
-            
-            var x = mouseLoc.x - (windowWidth / 2)
-            var y = mouseLoc.y + 20 // 20px above mouse
-            
-            // Boundary checks
-            if x < 0 { x = 10 }
-            if x + windowWidth > screen.width { x = screen.width - windowWidth - 10 }
-            if y + windowHeight > screen.height { y = mouseLoc.y - windowHeight - 20 }
-            
-            self.window?.setFrameOrigin(NSPoint(x: x, y: y))
-            self.window?.makeKeyAndOrderFront(nil)
-            
-            // Auto-hide after 15 seconds if not interacted with? Maybe not.
+            let screen = NSScreen.main?.frame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+            let winSize = hosting.view.frame.size
+            var x = mouseLoc.x - winSize.width / 2
+            var y = mouseLoc.y + 24
+
+            if x < 8 { x = 8 }
+            if x + winSize.width > screen.width - 8 { x = screen.width - winSize.width - 8 }
+            if y + winSize.height > screen.height - 8 { y = mouseLoc.y - winSize.height - 24 }
+
+            newPanel.setFrameOrigin(NSPoint(x: x, y: y))
+            newPanel.makeKeyAndOrderFront(nil)
+            self.panel = newPanel
         }
     }
-    
+
     func hide() {
         DispatchQueue.main.async {
-            self.window?.orderOut(nil)
-            self.content.isShowing = false
+            self.panel?.close()
+            self.panel = nil
         }
     }
 }
 
+// MARK: - FloatingResultView
+// Pure value view — receives title and text as constants, no observable binding needed
 struct FloatingResultView: View {
-    @ObservedObject var content: FloatingContent
+    let title: String
+    let text: String
     let onClose: () -> Void
     @State private var copied = false
-    
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(content.title)
-                    .font(.system(size: 13, weight: .bold))
+        VStack(alignment: .leading, spacing: 10) {
+            // Header
+            HStack(alignment: .center) {
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
                 Spacer()
                 Button(action: onClose) {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.secondary.opacity(0.5))
+                        .font(.system(size: 16))
+                        .foregroundColor(.secondary.opacity(0.6))
                 }
                 .buttonStyle(PlainButtonStyle())
             }
-            
-            ScrollView {
-                Text(content.text)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundColor(.primary)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .lineSpacing(4)
-            }
-            .frame(maxHeight: 300)
-            
+
+            Divider()
+
+            // Translation result — always visible
+            Text(text)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundColor(.primary)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .lineSpacing(4)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Divider()
+
+            // Footer
             HStack {
                 if copied {
-                    Text("已复制到剪贴板")
+                    Label("已复制", systemImage: "checkmark.circle.fill")
                         .font(.caption)
                         .foregroundColor(.green)
                         .transition(.opacity)
                 }
                 Spacer()
                 Button(action: {
-                    let pb = NSPasteboard.general
-                    pb.clearContents()
-                    pb.setString(content.text, forType: .string)
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(text, forType: .string)
                     withAnimation { copied = true }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) { withAnimation { copied = false } }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        withAnimation { copied = false }
+                    }
                 }) {
                     Label("复制", systemImage: "doc.on.doc")
-                        .font(.caption)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
+                        .font(.system(size: 12, weight: .semibold))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
                         .background(Color.accentColor)
                         .foregroundColor(.white)
-                        .cornerRadius(6)
+                        .cornerRadius(8)
                 }
                 .buttonStyle(PlainButtonStyle())
             }
@@ -122,6 +133,6 @@ struct FloatingResultView: View {
         .background(VisualEffectView(material: .hudWindow, blendingMode: .behindWindow))
         .cornerRadius(16)
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.primary.opacity(0.1), lineWidth: 1))
-        .shadow(radius: 10)
+        .shadow(color: Color.black.opacity(0.2), radius: 12, x: 0, y: 4)
     }
 }
