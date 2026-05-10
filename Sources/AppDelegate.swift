@@ -54,11 +54,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // 1. Hide popover to return focus to the previous app
         popover.performClose(nil)
         
+        let pb = NSPasteboard.general
+        let oldCount = pb.changeCount
+        
         // 2. Wait for focus transition
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            let pb = NSPasteboard.general
-            let oldCount = pb.changeCount
-            
             // 3. Simulate Cmd+C
             let source = CGEventSource(stateID: .hidSystemState)
             if let copyKeyDown = CGEvent(keyboardEventSource: source, virtualKey: 0x08, keyDown: true),
@@ -68,50 +68,44 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 copyKeyDown.post(tap: .cghidEventTap)
                 copyKeyUp.post(tap: .cghidEventTap)
             }
-        }
-        
-        // Poll for clipboard update (up to 1.5s: 15 attempts x 0.1s)
-        // Use translateText() so we don't overwrite the user's clipboard
-        func pollClipboard(attempts: Int) {
-            if pb.changeCount != oldCount,
-               let text = pb.string(forType: .string),
-               !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                // Clipboard was updated — translate the fresh selection
-                TranslateManager.shared.translateText(text) { result in
-                    if let res = result {
-                        let shortSource = text.count > 40 ? String(text.prefix(40)) + "..." : text
-                        FloatingWindowManager.shared.show(title: shortSource, text: res)
-                    } else {
-                        FloatingWindowManager.shared.show(title: "翻译失败", text: "请检查网络连接，或确认已开启辅助功能权限。")
+            
+            // 4. Poll for clipboard update (up to 1.5s)
+            func pollClipboard(attempts: Int) {
+                if pb.changeCount != oldCount,
+                   let text = pb.string(forType: .string),
+                   !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    TranslateManager.shared.translateText(text) { result in
+                        if let res = result {
+                            let shortSource = text.count > 40 ? String(text.prefix(40)) + "..." : text
+                            FloatingWindowManager.shared.show(title: shortSource, text: res)
+                        } else {
+                            FloatingWindowManager.shared.show(title: "翻译失败", text: "请检查网络连接。")
+                        }
                     }
-                }
-            } else if attempts < 15 {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    pollClipboard(attempts: attempts + 1)
-                }
-            } else {
-                // Timeout — fall back to whatever is currently on clipboard
-                guard let text = pb.string(forType: .string),
-                      !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                    FloatingWindowManager.shared.show(
-                        title: "无法获取选中内容",
-                        text: "请先在任意应用中选中文字，再按 Option+3。\n注：首次使用需在「系统设置 → 隐私与安全性 → 辅助功能」中开启 Creator Hub 权限。"
-                    )
-                    return
-                }
-                TranslateManager.shared.translateText(text) { result in
-                    if let res = result {
-                        FloatingWindowManager.shared.show(title: "剪贴板翻译", text: res)
-                    } else {
-                        FloatingWindowManager.shared.show(title: "翻译失败", text: "请检查网络连接。")
+                } else if attempts < 15 {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        pollClipboard(attempts: attempts + 1)
+                    }
+                } else {
+                    // Timeout fallback
+                    guard let text = pb.string(forType: .string),
+                          !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                        FloatingWindowManager.shared.show(title: "无法获取选中内容", text: "请先在任意应用中选中文字，再点击划词翻译。")
+                        return
+                    }
+                    TranslateManager.shared.translateText(text) { result in
+                        if let res = result {
+                            FloatingWindowManager.shared.show(title: "剪贴板翻译", text: res)
+                        } else {
+                            FloatingWindowManager.shared.show(title: "翻译失败", text: "请检查网络。")
+                        }
                     }
                 }
             }
-        }
-        
-        // Start polling after a brief delay to let the system process Cmd+C
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            pollClipboard(attempts: 0)
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                pollClipboard(attempts: 0)
+            }
         }
     }
     
