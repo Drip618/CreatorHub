@@ -51,18 +51,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func translateSelectedText() {
-        let pb = NSPasteboard.general
-        let oldCount = pb.changeCount
+        // 1. Hide popover to return focus to the previous app
+        popover.performClose(nil)
         
-        // Simulate Cmd+C to copy selected text
-        let source = CGEventSource(stateID: .hidSystemState)
-        if let copyKeyDown = CGEvent(keyboardEventSource: source, virtualKey: 0x08, keyDown: true),
-           let copyKeyUp = CGEvent(keyboardEventSource: source, virtualKey: 0x08, keyDown: false) {
-            copyKeyDown.flags = .maskCommand
-            copyKeyUp.flags = .maskCommand
-            copyKeyDown.post(tap: .cghidEventTap)
-            copyKeyUp.post(tap: .cghidEventTap)
-        }
+        // 2. Wait for focus transition
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            let pb = NSPasteboard.general
+            let oldCount = pb.changeCount
+            
+            // 3. Simulate Cmd+C
+            let source = CGEventSource(stateID: .hidSystemState)
+            if let copyKeyDown = CGEvent(keyboardEventSource: source, virtualKey: 0x08, keyDown: true),
+               let copyKeyUp = CGEvent(keyboardEventSource: source, virtualKey: 0x08, keyDown: false) {
+                copyKeyDown.flags = .maskCommand
+                copyKeyUp.flags = .maskCommand
+                copyKeyDown.post(tap: .cghidEventTap)
+                copyKeyUp.post(tap: .cghidEventTap)
+            }
         
         // Poll for clipboard update (up to 1.5s: 15 attempts x 0.1s)
         // Use translateText() so we don't overwrite the user's clipboard

@@ -51,55 +51,40 @@ class ImageProcessor: ObservableObject {
                         return
                     }
                     
-                    var finalImages: [CGImage] = []
-                    
                     switch action {
                     case .resize(let scale):
                         let finalSize = CGSize(width: CGFloat(Double(cgImage.width) * scale), height: CGFloat(Double(cgImage.height) * scale))
                         if let resized = self.resizeImage(cgImage, to: finalSize) {
-                            finalImages = [resized]
+                            self.saveProcessedImage(resized, originalUrl: url, outputFolder: outputFolder, action: action, index: 0, total: 1)
                         }
                     case .crop(let ratio):
                         if let cropped = self.cropImage(cgImage, toRatio: ratio) {
-                            finalImages = [cropped]
+                            self.saveProcessedImage(cropped, originalUrl: url, outputFolder: outputFolder, action: action, index: 0, total: 1)
                         }
                     case .convertFormat(_):
-                        finalImages = [cgImage]
+                        self.saveProcessedImage(cgImage, originalUrl: url, outputFolder: outputFolder, action: action, index: 0, total: 1)
                     case .sliceGrid(let rows, let cols):
-                        finalImages = self.sliceImage(cgImage, rows: rows, columns: cols)
+                        let sliceWidth = cgImage.width / cols
+                        let sliceHeight = cgImage.height / rows
+                        var count = 0
+                        for r in 0..<rows {
+                            for c in 0..<cols {
+                                let rect = CGRect(x: c * sliceWidth, y: r * sliceHeight, width: sliceWidth, height: sliceHeight)
+                                if let cropped = cgImage.cropping(to: rect) {
+                                    self.saveProcessedImage(cropped, originalUrl: url, outputFolder: outputFolder, action: action, index: count, total: rows * cols)
+                                    count += 1
+                                }
+                            }
+                        }
                     case .idPhotoMaker(let color):
                         if let idPhoto = self.createIDPhoto(cgImage, bgColor: color) {
-                            finalImages = [idPhoto]
+                            self.saveProcessedImage(idPhoto, originalUrl: url, outputFolder: outputFolder, action: action, index: 0, total: 1)
                         }
-                    }
-                    
-                    if finalImages.isEmpty { finalImages = [cgImage] }
-                    
-                    // Determine output format
-                    let targetType: UTType
-                    if case .convertFormat(let utType) = action {
-                        targetType = utType
-                    } else {
-                        targetType = .png 
-                    }
-                    
-                    let ext = targetType.preferredFilenameExtension ?? "png"
-                    let baseName = url.deletingPathExtension().lastPathComponent
-                    
-                    for (index, img) in finalImages.enumerated() {
-                        let suffix = finalImages.count > 1 ? String(format: "_%02d", index + 1) : "_processed"
-                        let fileName = baseName + suffix + "." + ext
-                        let fileURL = outputFolder.appendingPathComponent(fileName)
-                        
-                        let newNsImage = NSImage(cgImage: img, size: CGSize(width: img.width, height: img.height))
-                        self.saveImage(newNsImage, to: fileURL, format: targetType)
                     }
                     
                     completedCount += 1
                     let currentProgress = Double(completedCount) / Double(urls.count)
-                    DispatchQueue.main.async {
-                        self.progress = currentProgress
-                    }
+                    DispatchQueue.main.async { self.progress = currentProgress }
                 }
             }
             
@@ -108,6 +93,21 @@ class ImageProcessor: ObservableObject {
                 completion(true)
             }
         }
+    }
+    
+    private func saveProcessedImage(_ img: CGImage, originalUrl: URL, outputFolder: URL, action: ImageAction, index: Int, total: Int) {
+        let targetType: UTType
+        if case .convertFormat(let utType) = action { targetType = utType }
+        else { targetType = .png }
+        
+        let ext = targetType.preferredFilenameExtension ?? "png"
+        let baseName = originalUrl.deletingPathExtension().lastPathComponent
+        let suffix = total > 1 ? String(format: "_%02d", index + 1) : "_processed"
+        let fileName = baseName + suffix + "." + ext
+        let fileURL = outputFolder.appendingPathComponent(fileName)
+        
+        let newNsImage = NSImage(cgImage: img, size: CGSize(width: img.width, height: img.height))
+        self.saveImage(newNsImage, to: fileURL, format: targetType)
     }
     
     private func sliceImage(_ cgImage: CGImage, rows: Int, columns: Int) -> [CGImage] {

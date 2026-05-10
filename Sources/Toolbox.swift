@@ -14,6 +14,7 @@ struct ToolboxView: View {
     @ObservedObject var settings = SettingsManager.shared
     @ObservedObject var ultimateManager = UltimateManager.shared
     @ObservedObject var imageProcessor = ImageProcessor.shared
+    @ObservedObject var docManager = DocumentManager.shared
     @State private var showMessage: String? = nil
     
     // Config Sheet State
@@ -21,20 +22,30 @@ struct ToolboxView: View {
     @State private var selectedUrls: [URL] = []
     @State private var isConfigPresented: Bool = false
     
+    private var isAnyProcessing: Bool {
+        imageProcessor.isProcessing || ultimateManager.isProcessing || docManager.isProcessing
+    }
+    
+    private var currentProgress: Double {
+        if imageProcessor.isProcessing { return imageProcessor.progress }
+        if ultimateManager.isProcessing { return ultimateManager.progress }
+        return 0.0
+    }
+    
     var body: some View {
         ZStack {
             ScrollView {
                 VStack(spacing: 25) {
                     ToolboxSection(title: "🎬 创作流 (Creative Pro)", tools: [
                         ToolItem(icon: "camera.viewfinder", title: "屏幕截图", subtitle: "自动保存并拷贝至剪贴板", actionId: "screenshot", action: { triggerScreenshot(mode: .normal) }),
+                        ToolItem(icon: "text.magnifyingglass", title: "划词翻译", subtitle: "选中文字后一键翻译", actionId: "translate_selection", action: { (NSApp.delegate as? AppDelegate)?.translateSelectedText() }),
                         ToolItem(icon: "text.viewfinder", title: "文字识别", subtitle: "一键提取屏幕文字", actionId: "ocr", action: { triggerScreenshot(mode: .ocr) }),
                         ToolItem(icon: "character.book.closed", title: "图片翻译", subtitle: "截图 或 选择本地文件", actionId: "translate", action: { 
                             self.activeConfigType = .translation
                             self.isConfigPresented = true
                         }),
                         ToolItem(icon: "waveform", title: "音频标准化", subtitle: "一键平衡音量 (-14 LUFS)", actionId: "normalize_audio", action: { normalizeAudioFlow() }),
-                        ToolItem(icon: "video.fill", title: "万能视频转码", subtitle: "分辨率/格式/画质配置", actionId: "video_transcode", action: { pickFilesAsync(type: .videoTranscode) }),
-                        ToolItem(icon: "video.slash", title: "视频去水印", subtitle: "智能修补，批量去水印", actionId: "media_download", action: { showFFmpegDialogAsync() })
+                        ToolItem(icon: "video.fill", title: "万能视频转码", subtitle: "分辨率/格式/画质配置", actionId: "video_transcode", action: { pickFilesAsync(type: .videoTranscode) })
                     ])
                     
                     ToolboxSection(title: "🖼️ 影像工坊 (Image Lab)", tools: [
@@ -58,30 +69,25 @@ struct ToolboxView: View {
             // Modern Processing Overlay
             if isAnyProcessing {
                 ZStack {
-                    Color.black.opacity(0.4)
-                        .edgesIgnoringSafeArea(.all)
-                    
+                    Color.black.opacity(0.4).edgesIgnoringSafeArea(.all)
                     VStack(spacing: 20) {
                         ProgressView(value: currentProgress) {
-                            Text("正在处理中...")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(.white)
+                            Text("正在处理中...").font(.system(size: 14, weight: .bold)).foregroundColor(.white)
                         } currentValueLabel: {
-                            Text("\(Int(currentProgress * 100))%")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.white.opacity(0.8))
+                            Text("\(Int(currentProgress * 100))%").font(.system(size: 12, weight: .medium)).foregroundColor(.white.opacity(0.8))
                         }
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        .scaleEffect(1.5)
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white)).scaleEffect(1.5)
+                        Text("请稍候，任务正在后台执行").font(.system(size: 12)).foregroundColor(.white.opacity(0.6))
                         
-                        Text("请稍候，任务正在后台极速执行")
-                            .font(.system(size: 12))
-                            .foregroundColor(.white.opacity(0.6))
+                        Button(action: { 
+                            imageProcessor.isProcessing = false
+                            ultimateManager.isProcessing = false
+                            docManager.isProcessing = false
+                        }) {
+                            Text("强制取消").font(.system(size: 11)).foregroundColor(.white.opacity(0.5)).padding(.top, 10)
+                        }.buttonStyle(.plain)
                     }
-                    .padding(30)
-                    .background(Color(NSColor.windowBackgroundColor).opacity(0.9))
-                    .cornerRadius(20)
-                    .shadow(radius: 10)
+                    .padding(30).background(Color(NSColor.windowBackgroundColor).opacity(0.95)).cornerRadius(20).shadow(radius: 10)
                 }
                 .transition(.opacity)
             }
@@ -101,16 +107,6 @@ struct ToolboxView: View {
                 }
             }
         }
-    }
-
-    private var isAnyProcessing: Bool {
-        imageProcessor.isProcessing || ultimateManager.isProcessing || DocumentManager.shared.isProcessing
-    }
-    
-    private var currentProgress: Double {
-        if imageProcessor.isProcessing { return imageProcessor.progress }
-        if ultimateManager.isProcessing { return ultimateManager.progress }
-        return 0.0
     }
     
     // MARK: - Handlers
