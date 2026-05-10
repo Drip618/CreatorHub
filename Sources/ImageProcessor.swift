@@ -44,59 +44,62 @@ class ImageProcessor: ObservableObject {
             var completedCount = 0
             
             for url in urls {
-                guard let image = NSImage(contentsOf: url),
-                      let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-                    completedCount += 1
-                    continue
-                }
-                
-                var finalImages: [CGImage] = []
-                
-                switch action {
-                case .resize(let scale):
-                    let finalSize = CGSize(width: CGFloat(Double(cgImage.width) * scale), height: CGFloat(Double(cgImage.height) * scale))
-                    if let resized = self.resizeImage(cgImage, to: finalSize) {
-                        finalImages = [resized]
+                autoreleasepool {
+                    guard let image = NSImage(contentsOf: url),
+                          let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+                        completedCount += 1
+                        return
                     }
-                case .crop(let ratio):
-                    if let cropped = self.cropImage(cgImage, toRatio: ratio) {
-                        finalImages = [cropped]
-                    }
-                case .convertFormat(_):
-                    finalImages = [cgImage]
-                case .sliceGrid(let rows, let cols):
-                    finalImages = self.sliceImage(cgImage, rows: rows, columns: cols)
-                case .idPhotoMaker(let color):
-                    if let idPhoto = self.createIDPhoto(cgImage, bgColor: color) {
-                        finalImages = [idPhoto]
-                    }
-                }
-                
-                if finalImages.isEmpty { finalImages = [cgImage] }
-                
-                // Determine output format
-                let targetType: UTType
-                if case .convertFormat(let utType) = action {
-                    targetType = utType
-                } else {
-                    targetType = .png // Better for high-quality slices to avoid compression loss
-                }
-                
-                let ext = targetType.preferredFilenameExtension ?? "png"
-                let baseName = url.deletingPathExtension().lastPathComponent
-                
-                for (index, img) in finalImages.enumerated() {
-                    let suffix = finalImages.count > 1 ? String(format: "_%02d", index + 1) : "_processed"
-                    let fileName = baseName + suffix + "." + ext
-                    let fileURL = outputFolder.appendingPathComponent(fileName)
                     
-                    let newNsImage = NSImage(cgImage: img, size: CGSize(width: img.width, height: img.height))
-                    self.saveImage(newNsImage, to: fileURL, format: targetType)
-                }
-                
-                completedCount += 1
-                DispatchQueue.main.async {
-                    self.progress = Double(completedCount) / Double(urls.count)
+                    var finalImages: [CGImage] = []
+                    
+                    switch action {
+                    case .resize(let scale):
+                        let finalSize = CGSize(width: CGFloat(Double(cgImage.width) * scale), height: CGFloat(Double(cgImage.height) * scale))
+                        if let resized = self.resizeImage(cgImage, to: finalSize) {
+                            finalImages = [resized]
+                        }
+                    case .crop(let ratio):
+                        if let cropped = self.cropImage(cgImage, toRatio: ratio) {
+                            finalImages = [cropped]
+                        }
+                    case .convertFormat(_):
+                        finalImages = [cgImage]
+                    case .sliceGrid(let rows, let cols):
+                        finalImages = self.sliceImage(cgImage, rows: rows, columns: cols)
+                    case .idPhotoMaker(let color):
+                        if let idPhoto = self.createIDPhoto(cgImage, bgColor: color) {
+                            finalImages = [idPhoto]
+                        }
+                    }
+                    
+                    if finalImages.isEmpty { finalImages = [cgImage] }
+                    
+                    // Determine output format
+                    let targetType: UTType
+                    if case .convertFormat(let utType) = action {
+                        targetType = utType
+                    } else {
+                        targetType = .png 
+                    }
+                    
+                    let ext = targetType.preferredFilenameExtension ?? "png"
+                    let baseName = url.deletingPathExtension().lastPathComponent
+                    
+                    for (index, img) in finalImages.enumerated() {
+                        let suffix = finalImages.count > 1 ? String(format: "_%02d", index + 1) : "_processed"
+                        let fileName = baseName + suffix + "." + ext
+                        let fileURL = outputFolder.appendingPathComponent(fileName)
+                        
+                        let newNsImage = NSImage(cgImage: img, size: CGSize(width: img.width, height: img.height))
+                        self.saveImage(newNsImage, to: fileURL, format: targetType)
+                    }
+                    
+                    completedCount += 1
+                    let currentProgress = Double(completedCount) / Double(urls.count)
+                    DispatchQueue.main.async {
+                        self.progress = currentProgress
+                    }
                 }
             }
             

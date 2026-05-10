@@ -53,6 +53,38 @@ struct ToolboxView: View {
                 }
                 .padding(20)
             }
+            .disabled(isAnyProcessing)
+            
+            // Modern Processing Overlay
+            if isAnyProcessing {
+                ZStack {
+                    Color.black.opacity(0.4)
+                        .edgesIgnoringSafeArea(.all)
+                    
+                    VStack(spacing: 20) {
+                        ProgressView(value: currentProgress) {
+                            Text("正在处理中...")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(.white)
+                        } currentValueLabel: {
+                            Text("\(Int(currentProgress * 100))%")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.white.opacity(0.8))
+                        }
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .scaleEffect(1.5)
+                        
+                        Text("请稍候，任务正在后台极速执行")
+                            .font(.system(size: 12))
+                            .foregroundColor(.white.opacity(0.6))
+                    }
+                    .padding(30)
+                    .background(Color(NSColor.windowBackgroundColor).opacity(0.9))
+                    .cornerRadius(20)
+                    .shadow(radius: 10)
+                }
+                .transition(.opacity)
+            }
             
             if let msg = showMessage {
                 VStack {
@@ -69,6 +101,16 @@ struct ToolboxView: View {
                 }
             }
         }
+    }
+
+    private var isAnyProcessing: Bool {
+        imageProcessor.isProcessing || ultimateManager.isProcessing || DocumentManager.shared.isProcessing
+    }
+    
+    private var currentProgress: Double {
+        if imageProcessor.isProcessing { return imageProcessor.progress }
+        if ultimateManager.isProcessing { return ultimateManager.progress }
+        return 0.0
     }
     
     // MARK: - Handlers
