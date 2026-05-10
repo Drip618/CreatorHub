@@ -68,6 +68,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 copyKeyDown.post(tap: .cghidEventTap)
                 copyKeyUp.post(tap: .cghidEventTap)
             }
+        }
         
         // Poll for clipboard update (up to 1.5s: 15 attempts x 0.1s)
         // Use translateText() so we don't overwrite the user's clipboard
